@@ -1,6 +1,6 @@
-﻿using Grand.Core.Domain.Orders;
-using Grand.Core.Html;
+﻿using Grand.Domain.Orders;
 using Grand.Services.Catalog;
+using Grand.Services.Common;
 using Grand.Services.Shipping;
 using System;
 using System.Linq;
@@ -20,17 +20,10 @@ namespace Grand.Services.Orders
             if (orderNote == null)
                 throw new ArgumentNullException("orderNote");
 
-            string text = orderNote.Note;
-
-            if (String.IsNullOrEmpty(text))
-                return string.Empty;
-
-            text = HtmlHelper.FormatText(text, false, true, false, false, false, false);
-
-            return text;
+            return FormatText.ConvertText(orderNote.Note);
         }
 
-        
+
         /// <summary>
         /// Gets a total number of items in all shipments
         /// </summary>
@@ -114,13 +107,12 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="orderItem">Order item</param>
         /// <returns>Total number of already shipped items</returns>
-        public static async Task<int> GetTotalNumberOfShippedItems(this OrderItem orderItem, IOrderService orderService, IShipmentService shipmentService)
+        public static async Task<int> GetTotalNumberOfShippedItems(this OrderItem orderItem, Order order, IShipmentService shipmentService)
         {
             if (orderItem == null)
                 throw new ArgumentNullException("orderItem");
 
             var result = 0;
-            var order = await orderService.GetOrderByOrderItemId(orderItem.Id);
             var shipments = await shipmentService.GetShipmentsByOrder(order.Id);
             for (int i = 0; i < shipments.Count; i++)
             {
@@ -136,7 +128,7 @@ namespace Grand.Services.Orders
                     result += si.Quantity;
                 }
             }
-            
+
             return result;
         }
 
@@ -145,13 +137,12 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="orderItem">Order  item</param>
         /// <returns>Total number of already delivered items</returns>
-        public static async Task<int> GetTotalNumberOfDeliveredItems(this OrderItem orderItem, IOrderService orderService, IShipmentService shipmentService)
+        public static async Task<int> GetTotalNumberOfDeliveredItems(this OrderItem orderItem, Order order, IShipmentService shipmentService)
         {
             if (orderItem == null)
                 throw new ArgumentNullException("orderItem");
 
             var result = 0;
-            var order = await orderService.GetOrderByOrderItemId(orderItem.Id);
             var shipments = await shipmentService.GetShipmentsByOrder(order.Id);
             for (int i = 0; i < shipments.Count; i++)
             {
@@ -230,7 +221,7 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="order">Order</param>
         /// <returns>A value indicating whether an order has items to deliver</returns>
-        public static async Task<bool> HasItemsToDeliver(this Order order, IOrderService orderService, IShipmentService shipmentService, IProductService productService)
+        public static async Task<bool> HasItemsToDeliver(this Order order, IShipmentService shipmentService, IProductService productService)
         {
             if (order == null)
                 throw new ArgumentNullException("order");
@@ -242,8 +233,8 @@ namespace Grand.Services.Orders
                 if (!product.IsShipEnabled)
                     continue;
 
-                var totalNumberOfShippedItems = await orderItem.GetTotalNumberOfShippedItems(orderService, shipmentService);
-                var totalNumberOfDeliveredItems = await orderItem.GetTotalNumberOfDeliveredItems(orderService, shipmentService);
+                var totalNumberOfShippedItems = await orderItem.GetTotalNumberOfShippedItems(order, shipmentService);
+                var totalNumberOfDeliveredItems = await orderItem.GetTotalNumberOfDeliveredItems(order, shipmentService);
                 if (totalNumberOfShippedItems <= totalNumberOfDeliveredItems)
                     continue;
 
@@ -251,6 +242,21 @@ namespace Grand.Services.Orders
                 return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// Indicates whether a order's tag exists
+        /// </summary>
+        /// <param name="order">Order</param>
+        /// <param name="orderTagId">Order tag identifier</param>
+        /// <returns>Result</returns>
+        public static bool OrderTagExists(this Order order, OrderTag orderTag)
+        {
+            if (order == null)
+                throw new ArgumentNullException("order");
+
+            bool result = order.OrderTags.FirstOrDefault(t => t == orderTag.Id) != null;
+            return result;
         }
     }
 }

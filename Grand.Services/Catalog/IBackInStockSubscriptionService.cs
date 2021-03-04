@@ -1,5 +1,7 @@
-using Grand.Core;
-using Grand.Core.Domain.Catalog;
+using Grand.Domain;
+using Grand.Domain.Catalog;
+using Grand.Domain.Common;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Grand.Services.Catalog
@@ -29,26 +31,13 @@ namespace Grand.Services.Catalog
         /// <summary>
         /// Gets all subscriptions
         /// </summary>
-        /// <param name="productId">Product identifier</param>
-        /// <param name="attributeXml">Attribute xml</param>
-        /// <param name="warehouseId">Warehouse ident</param>
-        /// <param name="storeId">Store identifier; pass "" to load all records</param>
-        /// <param name="pageIndex">Page index</param>
-        /// <param name="pageSize">Page size</param>
-        /// <returns>Subscriptions</returns>
-        Task<IPagedList<BackInStockSubscription>> GetAllSubscriptionsByProductId(string productId, string attributeXml, string warehouseId,
-            string storeId = "", int pageIndex = 0, int pageSize = int.MaxValue);
-
-        /// <summary>
-        /// Gets all subscriptions
-        /// </summary>
         /// <param name="customerId">Customer id</param>
         /// <param name="productId">Product identifier</param>
-        /// <param name="attrxml">Attribute xml</param>
+        /// <param name="attributes">Attribute</param>
         /// <param name="storeId">Store identifier</param>
         /// <param name="warehouseId">Warehouse identifier</param>
         /// <returns>Subscriptions</returns>
-        Task<BackInStockSubscription> FindSubscription(string customerId, string productId, string attributexml, string storeId, string warehouseId);
+        Task<BackInStockSubscription> FindSubscription(string customerId, string productId, IList<CustomAttribute> attributes, string storeId, string warehouseId);
 
         /// <summary>
         /// Gets a subscription
@@ -75,15 +64,15 @@ namespace Grand.Services.Catalog
         /// <param name="product">Product</param>
         /// <param name="warehouse">Warehouse ident</param>
         /// <returns>Number of sent email</returns>
-        Task<int> SendNotificationsToSubscribers(Product product, string warehouse);
+        Task SendNotificationsToSubscribers(Product product, string warehouse);
 
         /// <summary>
         /// Send notification to subscribers
         /// </summary>
         /// <param name="product">Product</param>
-        /// <param name="attributeXml">Attribute xml</param>
+        /// <param name="attributes">Attribute</param>
         /// <param name="warehouse">Warehouse ident</param>
         /// <returns>Number of sent email</returns>
-        Task<int> SendNotificationsToSubscribers(Product product, string attributeXml, string warehouse);
+        Task SendNotificationsToSubscribers(Product product, IList<CustomAttribute> attributes, string warehouse);
     }
 }

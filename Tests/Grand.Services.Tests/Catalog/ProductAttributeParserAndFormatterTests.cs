@@ -1,10 +1,10 @@
 ﻿using Grand.Core;
 using Grand.Core.Caching;
-using Grand.Core.Data;
-using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Localization;
-using Grand.Core.Domain.Orders;
+using Grand.Domain.Data;
+using Grand.Domain.Catalog;
+using Grand.Domain.Customers;
+using Grand.Domain.Localization;
+using Grand.Domain.Orders;
 using Grand.Core.Tests.Caching;
 using Grand.Services.Directory;
 using Grand.Services.Events;
@@ -17,6 +17,9 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using Grand.Domain.Common;
+using System.Linq;
 
 namespace Grand.Services.Catalog.Tests
 {
@@ -37,7 +40,7 @@ namespace Grand.Services.Catalog.Tests
         private IWebHelper _webHelper;
         private ShoppingCartSettings _shoppingCartSettings;
         private IProductAttributeFormatter _productAttributeFormatter;
-
+        private IProductService _productService;
         private ProductAttribute pa1, pa2, pa3;
         private ProductAttributeMapping pam1_1, pam2_1, pam3_1;
         private ProductAttributeValue pav1_1, pav1_2, pav2_1, pav2_2;
@@ -166,6 +169,7 @@ namespace Grand.Services.Catalog.Tests
             _downloadService = new Mock<IDownloadService>().Object;
             _webHelper = new Mock<IWebHelper>().Object;
             _shoppingCartSettings = new Mock<ShoppingCartSettings>().Object;
+            _productService = new Mock<IProductService>().Object;
 
             _productAttributeFormatter = new ProductAttributeFormatter(_workContext,
                 _productAttributeService,
@@ -177,19 +181,20 @@ namespace Grand.Services.Catalog.Tests
                 _downloadService,
                 _webHelper,
                 _priceCalculationService,
+                _productService,
                 _shoppingCartSettings);
         }
 
         [TestMethod()]
         public void Can_add_and_parse_productAttributes() {
-            string attributes = "";
+            var attributes = new List<CustomAttribute>();
             //color: green
-            attributes = _productAttributeParser.AddProductAttribute(attributes, pam1_1, pav1_1.Id.ToString());
+            attributes = _productAttributeParser.AddProductAttribute(attributes, pam1_1, pav1_1.Id.ToString()).ToList();
             //custom option: option 1, option 2
-            attributes = _productAttributeParser.AddProductAttribute(attributes, pam2_1, pav2_1.Id.ToString());
-            attributes = _productAttributeParser.AddProductAttribute(attributes, pam2_1, pav2_2.Id.ToString());
+            attributes = _productAttributeParser.AddProductAttribute(attributes, pam2_1, pav2_1.Id.ToString()).ToList();
+            attributes = _productAttributeParser.AddProductAttribute(attributes, pam2_1, pav2_2.Id.ToString()).ToList();
             //custom text
-            attributes = _productAttributeParser.AddProductAttribute(attributes, pam3_1, "Some custom text goes here");
+            attributes = _productAttributeParser.AddProductAttribute(attributes, pam3_1, "Some custom text goes here").ToList();
 
             var parsed_attributeValues = _productAttributeParser.ParseProductAttributeValues(_product, attributes);//!
             Assert.IsTrue(parsed_attributeValues.Contains(pav1_1));
@@ -206,19 +211,19 @@ namespace Grand.Services.Catalog.Tests
 
         [TestMethod()]
         public void Can_add_and_remove_productAttributes() {
-            string attributes = "";
+            var attributes = new List<CustomAttribute>();
             //color: green
-            attributes = _productAttributeParser.AddProductAttribute(attributes, pam1_1, pav1_1.Id.ToString());
+            attributes = _productAttributeParser.AddProductAttribute(attributes, pam1_1, pav1_1.Id.ToString()).ToList();
             //custom option: option 1, option 2
-            attributes = _productAttributeParser.AddProductAttribute(attributes, pam2_1, pav2_1.Id.ToString());
-            attributes = _productAttributeParser.AddProductAttribute(attributes, pam2_1, pav2_2.Id.ToString());
+            attributes = _productAttributeParser.AddProductAttribute(attributes, pam2_1, pav2_1.Id.ToString()).ToList();
+            attributes = _productAttributeParser.AddProductAttribute(attributes, pam2_1, pav2_2.Id.ToString()).ToList();
             //custom text
-            attributes = _productAttributeParser.AddProductAttribute(attributes, pam3_1, "Some custom text goes here");
+            attributes = _productAttributeParser.AddProductAttribute(attributes, pam3_1, "Some custom text goes here").ToList();
             //delete some of them
-            attributes = _productAttributeParser.RemoveProductAttribute(attributes, pam2_1);
-            attributes = _productAttributeParser.RemoveProductAttribute(attributes, pam3_1);
+            attributes = _productAttributeParser.RemoveProductAttribute(attributes, pam2_1).ToList();
+            attributes = _productAttributeParser.RemoveProductAttribute(attributes, pam3_1).ToList();
 
-            var parsed_attributeValues = _productAttributeParser.ParseProductAttributeValues(_product, attributes);//!
+            var parsed_attributeValues = _productAttributeParser.ParseProductAttributeValues(_product, attributes).ToList();//!
             Assert.IsTrue(parsed_attributeValues.Contains(pav1_1));
             Assert.IsFalse(parsed_attributeValues.Contains(pav1_2));
             Assert.IsFalse(parsed_attributeValues.Contains(pav2_1));
@@ -231,10 +236,10 @@ namespace Grand.Services.Catalog.Tests
 
         [TestMethod()]
         public void Can_add_and_parse_giftCardAttributes() {
-            string attributes = "";
+            var attributes = new List<CustomAttribute>();
             attributes = _productAttributeParser.AddGiftCardAttribute(attributes,
                 "recipientName 1", "recipientEmail@gmail.com",
-                "senderName 1", "senderEmail@gmail.com", "custom message");
+                "senderName 1", "senderEmail@gmail.com", "custom message").ToList();
 
             string recipientName, recipientEmail, senderName, senderEmail, giftCardMessage;
             _productAttributeParser.GetGiftCardAttribute(attributes,
@@ -252,9 +257,10 @@ namespace Grand.Services.Catalog.Tests
 
         [TestMethod()]
         public async Task Can_render_virtual_gift_cart() {
-            string attributes = _productAttributeParser.AddGiftCardAttribute("",
+            var attribut = new List<CustomAttribute>();
+            var attributes = _productAttributeParser.AddGiftCardAttribute(attribut,
                 "recipientName 1", "recipientEmail@gmail.com",
-                "senderName 1", "senderEmail@gmail.com", "custom message");
+                "senderName 1", "senderEmail@gmail.com", "custom message").ToList();
 
             var product = new Product {
                 IsGiftCard = true,
@@ -270,7 +276,7 @@ namespace Grand.Services.Catalog.Tests
 
         [TestMethod()]
         public async Task Can_render_physical_gift_cart() {
-            string attributes = _productAttributeParser.AddGiftCardAttribute("",
+            var attributes = _productAttributeParser.AddGiftCardAttribute(new List<CustomAttribute>(),
                 "recipientName 1", "recipientEmail@gmail.com",
                 "senderName 1", "senderEmail@gmail.com", "custom message");
 

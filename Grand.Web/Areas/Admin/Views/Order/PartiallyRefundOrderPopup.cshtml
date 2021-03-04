@@ -1,11 +1,11 @@
 ﻿@{
-    Layout = "~/Areas/Admin/Views/Shared/_AdminPopupLayout.cshtml";
+    Layout = Grand.Web.Areas.Admin.Extensions.Constants.Layout_AdminPopup;
     //page title
     ViewBag.Title = T("Admin.Orders.Fields.PartialRefund").Text;
 }
 @model OrderModel
 
-<form asp-controller="Order" asp-action="PartiallyRefundOrderPopup" method="post"
+<form asp-area="@Constants.AreaAdmin" asp-controller="Order" asp-action="PartiallyRefundOrderPopup" method="post"
       asp-route-OrderId="@Context.Request.Query["OrderId"]"
       asp-route-btnId="@Context.Request.Query["btnId"]"
       asp-route-online="@Context.Request.Query["online"]"
@@ -24,7 +24,7 @@
                 <vc:admin-widget widget-zone="order_partially_refund_buttons" additional-data="Model" />
                 <div class="note note-info">
                     <strong>
-                        @string.Format(T("Admin.Orders.Fields.PartialRefund.OrderInfo").Text, Model.Id)
+                        @string.Format(T("Admin.Orders.Fields.PartialRefund.OrderInfo").Text, Model.OrderNumber)
                     </strong>
                 </div>
                 <div class="x_content form">
@@ -34,7 +34,7 @@
                                 <admin-label asp-for="AmountToRefund" />
                                 <div class="col-md-9 col-sm-9">
                                     <admin-input asp-for="AmountToRefund" />: &nbsp;&nbsp;&nbsp; <span style="white-space: nowrap">
-                                        @string.Format(T("Admin.Orders.Fields.PartialRefund.AmountToRefund.Max").Text, Model.MaxAmountToRefund.ToString("G29"), Model.PrimaryStoreCurrencyCode)
+                                        @string.Format(T("Admin.Orders.Fields.PartialRefund.AmountToRefund.Max").Text, Model.MaxAmountToRefund.ToString("G29"), Model.CurrencyCode)
                                     </span>
                                 </div>
                             </div>
@@ -51,8 +51,10 @@
     <div asp-validation-summary="All"></div>
     @if (ViewBag.RefreshPage == true)
     {
-        <script type="text/javascript">
-            try {window.opener.document.forms['@(Context.Request.Query["formId"])'].@(Context.Request.Query["btnId"]).click();}
+        <script>
+            try {
+                window.opener.location.href = window.opener.location.href;
+            }
             catch (e){}
             window.close();
         </script>

@@ -1,16 +1,15 @@
-﻿using FluentValidation.Attributes;
-using Grand.Framework.Mvc.ModelBinding;
-using Grand.Framework.Mvc.Models;
+﻿using Grand.Domain.Customers;
+using Grand.Core.ModelBinding;
+using Grand.Core.Models;
 using Grand.Web.Models.Newsletter;
-using Grand.Web.Validators.Customer;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace Grand.Web.Models.Customer
 {
-    [Validator(typeof(CustomerInfoValidator))]
-    public partial class CustomerInfoModel : BaseGrandModel
+    public partial class CustomerInfoModel : BaseModel
     {
         public CustomerInfoModel()
         {
@@ -22,8 +21,10 @@ namespace Grand.Web.Models.Customer
             NewsletterCategories = new List<NewsletterSimpleCategory>();
         }
 
+        [DataType(DataType.EmailAddress)]
         [GrandResourceDisplayName("Account.Fields.Email")]
         public string Email { get; set; }
+        public bool AllowUsersToChangeEmail { get; set; }
 
         public bool CheckUsernameAvailabilityEnabled { get; set; }
         public bool AllowUsersToChangeUsernames { get; set; }
@@ -103,11 +104,13 @@ namespace Grand.Web.Models.Customer
 
         public bool PhoneEnabled { get; set; }
         public bool PhoneRequired { get; set; }
+        [DataType(DataType.PhoneNumber)]
         [GrandResourceDisplayName("Account.Fields.Phone")]
         public string Phone { get; set; }
 
         public bool FaxEnabled { get; set; }
         public bool FaxRequired { get; set; }
+
         [GrandResourceDisplayName("Account.Fields.Fax")]
         public string Fax { get; set; }
 
@@ -115,14 +118,9 @@ namespace Grand.Web.Models.Customer
         [GrandResourceDisplayName("Account.Fields.Newsletter")]
         public bool Newsletter { get; set; }
 
-        //preferences
-        public bool SignatureEnabled { get; set; }
-        [GrandResourceDisplayName("Account.Fields.Signature")]
-        public string Signature { get; set; }
-
         //2factory
         public bool Is2faEnabled { get; set; }
-        
+
         //time zone
         [GrandResourceDisplayName("Account.Fields.TimeZone")]
         public string TimeZoneId { get; set; }
@@ -142,30 +140,31 @@ namespace Grand.Web.Models.Customer
 
         public IList<CustomerAttributeModel> CustomerAttributes { get; set; }
 
-        public IList<NewsletterSimpleCategory> NewsletterCategories { get; set; }        
-        
+        public IList<NewsletterSimpleCategory> NewsletterCategories { get; set; }
+
 
         #region Nested classes
 
-        public partial class AssociatedExternalAuthModel : BaseGrandEntityModel
+        public partial class AssociatedExternalAuthModel : BaseEntityModel
         {
             public string Email { get; set; }
             public string ExternalIdentifier { get; set; }
             public string AuthMethodName { get; set; }
         }
 
-        public class TwoFactorAuthenticationModel : BaseGrandModel
+        public class TwoFactorAuthenticationModel : BaseModel
         {
             public TwoFactorAuthenticationModel()
             {
                 CustomValues = new Dictionary<string, string>();
             }
+            public TwoFactorAuthenticationType TwoFactorAuthenticationType { get; set; }
             public string SecretKey { get; set; }
             public string Code { get; set; }
             public IDictionary<string, string> CustomValues { get; set; }
         }
 
-        public class TwoFactorAuthorizationModel : BaseGrandModel
+        public class TwoFactorAuthorizationModel : BaseModel
         {
             public string Code { get; set; }
             public string UserName { get; set; }

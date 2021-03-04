@@ -1,9 +1,8 @@
 ﻿using DotLiquid;
-using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Localization;
-using Grand.Core.Domain.Stores;
+using Grand.Domain.Catalog;
+using Grand.Domain.Localization;
+using Grand.Domain.Stores;
 using Grand.Services.Seo;
-using Grand.Services.Stores;
 using System.Collections.Generic;
 
 namespace Grand.Services.Messages.DotLiquidDrops
@@ -17,21 +16,23 @@ namespace Grand.Services.Messages.DotLiquidDrops
 
         public LiquidBackInStockSubscription(Product product, BackInStockSubscription backInStockSubscription, Store store, Language language)
         {
-            this._backInStockSubscription = backInStockSubscription;
-            this._product = product;
-            this._store = store;
-            this._language = language;
+            _backInStockSubscription = backInStockSubscription;
+            _product = product;
+            _store = store;
+            _language = language;
 
             AdditionalTokens = new Dictionary<string, string>();
         }
 
-        public string ProductName
-        {
+        public string ProductName {
             get { return _product.Name; }
         }
 
-        public string ProductUrl
-        {
+        public string AttributeInfo {
+            get { return _backInStockSubscription.AttributeInfo; }
+        }
+
+        public string ProductUrl {
             get { return string.Format("{0}{1}", _store.SslEnabled ? _store.SecureUrl : _store.Url, _product.GetSeName(_language.Id)); }
         }
 

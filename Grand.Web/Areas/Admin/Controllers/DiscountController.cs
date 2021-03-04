@@ -1,5 +1,6 @@
 ﻿using Grand.Core;
-using Grand.Core.Domain.Customers;
+using Grand.Domain;
+using Grand.Domain.Customers;
 using Grand.Framework.Controllers;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
@@ -69,6 +70,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
+        [PermissionAuthorizeAction(PermissionActionName.List)]
         public async Task<IActionResult> List(DiscountListModel model, DataSourceRequest command)
         {
             var (discountModel, totalCount) = await _discountViewModelService.PrepareDiscountModel(model, command.Page, command.PageSize);
@@ -80,6 +82,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         //create
+        [PermissionAuthorizeAction(PermissionActionName.Create)]
         public async Task<IActionResult> Create()
         {
             var model = new DiscountModel();
@@ -94,6 +97,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
+        [PermissionAuthorizeAction(PermissionActionName.Create)]
         public async Task<IActionResult> Create(DiscountModel model, bool continueEditing)
         {
             if (ModelState.IsValid)
@@ -118,6 +122,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         //edit
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         public async Task<IActionResult> Edit(string id)
         {
             var discount = await _discountService.GetDiscountById(id);
@@ -146,6 +151,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public async Task<IActionResult> Edit(DiscountModel model, bool continueEditing)
         {
             var discount = await _discountService.GetDiscountById(model.Id);
@@ -187,6 +193,7 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         //delete
         [HttpPost]
+        [PermissionAuthorizeAction(PermissionActionName.Delete)]
         public async Task<IActionResult> Delete(string id)
         {
             var discount = await _discountService.GetDiscountById(id);
@@ -220,6 +227,7 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Discount coupon codes
         [HttpPost]
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         public async Task<IActionResult> CouponCodeList(DataSourceRequest command, string discountId)
         {
             var discount = await _discountService.GetDiscountById(discountId);
@@ -239,6 +247,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public async Task<IActionResult> CouponCodeDelete(string discountId, string Id)
         {
             var discount = await _discountService.GetDiscountById(discountId);
@@ -260,6 +269,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return ErrorForKendoGridJson(ModelState);
 
         }
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public async Task<IActionResult> CouponCodeInsert(string discountId, string couponCode)
         {
             if (string.IsNullOrEmpty(couponCode))
@@ -285,6 +295,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region Discount requirements
 
         [AcceptVerbs("GET")]
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         public async Task<IActionResult> GetDiscountRequirementConfigurationUrl(string systemName, string discountId, string discountRequirementId)
         {
             if (String.IsNullOrEmpty(systemName))
@@ -304,6 +315,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(new { url = url });
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         public async Task<IActionResult> GetDiscountRequirementMetaInfo(string discountRequirementId, string discountId)
         {
             var discount = await _discountService.GetDiscountById(discountId);
@@ -326,6 +338,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public async Task<IActionResult> DeleteDiscountRequirement(string discountRequirementId, string discountId)
         {
             var discount = await _discountService.GetDiscountById(discountId);
@@ -348,6 +361,7 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Applied to products
 
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         [HttpPost]
         public async Task<IActionResult> ProductList(DataSourceRequest command, string discountId, [FromServices] IProductService productService)
         {
@@ -367,6 +381,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public async Task<IActionResult> ProductDelete(string discountId, string productId, [FromServices] IProductService productService)
         {
             var discount = await _discountService.GetDiscountById(discountId);
@@ -385,12 +400,14 @@ namespace Grand.Web.Areas.Admin.Controllers
             return ErrorForKendoGridJson(ModelState);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public async Task<IActionResult> ProductAddPopup(string discountId)
         {
             var model = await _discountViewModelService.PrepareProductToDiscountModel();
             return View(model);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         public async Task<IActionResult> ProductAddPopupList(DataSourceRequest command, DiscountModel.AddProductToDiscountModel model)
         {
@@ -404,6 +421,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         [FormValueRequired("save")]
         public async Task<IActionResult> ProductAddPopup(DiscountModel.AddProductToDiscountModel model)
@@ -425,6 +443,7 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Applied to categories
 
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         [HttpPost]
         public async Task<IActionResult> CategoryList(DataSourceRequest command, string discountId, [FromServices] ICategoryService categoryService)
         {
@@ -438,7 +457,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             {
                 items.Add(new DiscountModel.AppliedToCategoryModel {
                     CategoryId = item.Id,
-                    CategoryName = await item.GetFormattedBreadCrumb(categoryService)
+                    CategoryName = await categoryService.GetFormattedBreadCrumb(item)
                 });
             }
             var gridModel = new DataSourceResult {
@@ -449,6 +468,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public async Task<IActionResult> CategoryDelete(string discountId, string categoryId, [FromServices] ICategoryService categoryService)
         {
             var discount = await _discountService.GetDiscountById(discountId);
@@ -467,12 +487,14 @@ namespace Grand.Web.Areas.Admin.Controllers
             return ErrorForKendoGridJson(ModelState);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public IActionResult CategoryAddPopup(string discountId)
         {
             var model = new DiscountModel.AddCategoryToDiscountModel();
             return View(model);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         public async Task<IActionResult> CategoryAddPopupList(DataSourceRequest command, DiscountModel.AddCategoryToDiscountModel model, [FromServices] ICategoryService categoryService)
         {
@@ -482,7 +504,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             foreach (var item in categories)
             {
                 var categoryModel = item.ToModel();
-                categoryModel.Breadcrumb = await item.GetFormattedBreadCrumb(categoryService);
+                categoryModel.Breadcrumb = await categoryService.GetFormattedBreadCrumb(item);
                 items.Add(categoryModel);
             }
             var gridModel = new DataSourceResult {
@@ -493,6 +515,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         [FormValueRequired("save")]
         public async Task<IActionResult> CategoryAddPopup(DiscountModel.AddCategoryToDiscountModel model)
@@ -513,6 +536,7 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Applied to manufacturers
 
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         [HttpPost]
         public async Task<IActionResult> ManufacturerList(DataSourceRequest command, string discountId, [FromServices] IManufacturerService manufacturerService)
         {
@@ -532,6 +556,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public async Task<IActionResult> ManufacturerDelete(string discountId, string manufacturerId, [FromServices] IManufacturerService manufacturerService)
         {
             var discount = await _discountService.GetDiscountById(discountId);
@@ -550,12 +575,14 @@ namespace Grand.Web.Areas.Admin.Controllers
             return ErrorForKendoGridJson(ModelState);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public IActionResult ManufacturerAddPopup(string discountId)
         {
             var model = new DiscountModel.AddManufacturerToDiscountModel();
             return View(model);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         public async Task<IActionResult> ManufacturerAddPopupList(DataSourceRequest command, DiscountModel.AddManufacturerToDiscountModel model, [FromServices] IManufacturerService manufacturerService)
         {
@@ -569,6 +596,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         [FormValueRequired("save")]
         public async Task<IActionResult> ManufacturerAddPopup(DiscountModel.AddManufacturerToDiscountModel model)
@@ -589,6 +617,7 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Applied to vendors
 
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         [HttpPost]
         public async Task<IActionResult> VendorList(DataSourceRequest command, string discountId, [FromServices] IVendorService vendorService)
         {
@@ -608,6 +637,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public async Task<IActionResult> VendorDelete(string discountId, string vendorId, [FromServices] IVendorService vendorService)
         {
             var discount = await _discountService.GetDiscountById(discountId);
@@ -625,12 +655,14 @@ namespace Grand.Web.Areas.Admin.Controllers
             return ErrorForKendoGridJson(ModelState);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public IActionResult VendorAddPopup(string discountId)
         {
             var model = new DiscountModel.AddVendorToDiscountModel();
             return View(model);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         public async Task<IActionResult> VendorAddPopupList(DataSourceRequest command, DiscountModel.AddVendorToDiscountModel model, [FromServices] IVendorService vendorService)
         {
@@ -640,7 +672,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             if (!(string.IsNullOrEmpty(model.SearchVendorEmail)))
             {
                 var tempVendors = vendors.Where(x => x.Email.ToLowerInvariant().Contains(model.SearchVendorEmail.Trim()));
-                vendors = new PagedList<Core.Domain.Vendors.Vendor>(tempVendors, command.Page - 1, command.PageSize);
+                vendors = new PagedList<Domain.Vendors.Vendor>(tempVendors, command.Page - 1, command.PageSize);
             }
 
             var gridModel = new DataSourceResult {
@@ -651,6 +683,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         [FormValueRequired("save")]
         public async Task<IActionResult> VendorAddPopup(DiscountModel.AddVendorToDiscountModel model)
@@ -671,6 +704,7 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Discount usage history
 
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         [HttpPost]
         public async Task<IActionResult> UsageHistoryList(string discountId, DataSourceRequest command)
         {
@@ -686,6 +720,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         public async Task<IActionResult> UsageHistoryDelete(string discountId, string id)
         {

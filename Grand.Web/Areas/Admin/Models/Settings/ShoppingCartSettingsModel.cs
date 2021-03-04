@@ -1,9 +1,9 @@
-﻿using Grand.Framework.Mvc.ModelBinding;
-using Grand.Framework.Mvc.Models;
+﻿using Grand.Core.ModelBinding;
+using Grand.Core.Models;
 
 namespace Grand.Web.Areas.Admin.Models.Settings
 {
-    public partial class ShoppingCartSettingsModel : BaseGrandModel
+    public partial class ShoppingCartSettingsModel : BaseModel
     {
         public string ActiveStoreScopeConfiguration { get; set; }
 
@@ -80,5 +80,9 @@ namespace Grand.Web.Areas.Admin.Models.Settings
         [GrandResourceDisplayName("Admin.Configuration.Settings.ShoppingCart.CartsSharedBetweenStores")]
         public bool CartsSharedBetweenStores { get; set; }
         public bool CartsSharedBetweenStores_OverrideForStore { get; set; }
+
+        [GrandResourceDisplayName("Admin.Configuration.Settings.ShoppingCart.AllowOnHoldCart")]
+        public bool AllowOnHoldCart { get; set; }
+        public bool AllowOnHoldCart_OverrideForStore { get; set; }
     }
 }

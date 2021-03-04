@@ -1,7 +1,7 @@
-﻿using Grand.Core.Infrastructure;
+﻿using Grand.Core;
 using Grand.Framework.Infrastructure.Extensions;
-using Grand.Framework.Mvc.Routing;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,7 +18,7 @@ namespace Grand.Framework.StartupConfigure
         /// <param name="services">Collection of service descriptors</param>
         /// <param name="configuration">Configuration root of the application</param>
         public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
-        {            
+        {
             //add healthChecks
             services.AddGrandHealthChecks();
 
@@ -30,9 +30,6 @@ namespace Grand.Framework.StartupConfigure
 
             //add mediatR
             services.AddMediator();
-
-            //adddetection device
-            services.AddDetectionDevice();
 
             //add and configure MVC feature
             services.AddGrandMvc(configuration);
@@ -49,7 +46,8 @@ namespace Grand.Framework.StartupConfigure
         /// Configure the using of added middleware
         /// </summary>
         /// <param name="application">Builder for configuring an application's request pipeline</param>
-        public void Configure(IApplicationBuilder application)
+        /// <param name="webHostEnvironment">WebHostEnvironment</param>
+        public void Configure(IApplicationBuilder application, IWebHostEnvironment webHostEnvironment)
         {
             //add MiniProfiler
             application.UseProfiler();
@@ -64,8 +62,7 @@ namespace Grand.Framework.StartupConfigure
         /// <summary>
         /// Gets order of this startup configuration implementation
         /// </summary>
-        public int Order
-        {
+        public int Order {
             //MVC should be loaded last
             get { return 1000; }
         }

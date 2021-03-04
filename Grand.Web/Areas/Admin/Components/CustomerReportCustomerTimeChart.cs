@@ -5,13 +5,13 @@ using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Components
 {
-    public class CustomerReportCustomerTimeChartViewComponent : BaseViewComponent
+    public class CustomerReportCustomerTimeChartViewComponent : BaseAdminViewComponent
     {
         private readonly IPermissionService _permissionService;
 
         public CustomerReportCustomerTimeChartViewComponent(IPermissionService permissionService)
         {
-            this._permissionService = permissionService;
+            _permissionService = permissionService;
         }
 
         public async Task<IViewComponentResult> InvokeAsync()

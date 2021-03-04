@@ -1,5 +1,6 @@
-﻿using Grand.Core.Domain.Seo;
-using Grand.Core.Domain.Topics;
+﻿using Grand.Domain.Seo;
+using Grand.Domain.Topics;
+using Grand.Services.Helpers;
 using Grand.Services.Localization;
 using Grand.Services.Logging;
 using Grand.Services.Seo;
@@ -23,10 +24,11 @@ namespace Grand.Web.Areas.Admin.Services
         private readonly ICustomerActivityService _customerActivityService;
         private readonly IStoreService _storeService;
         private readonly ILanguageService _languageService;
+        private readonly IDateTimeHelper _dateTimeHelper;
         private readonly SeoSettings _seoSettings;
 
         public TopicViewModelService(ITopicTemplateService topicTemplateService, ITopicService topicService, IUrlRecordService urlRecordService, ILocalizationService localizationService,
-            ICustomerActivityService customerActivityService, IStoreService storeService, ILanguageService languageService, SeoSettings seoSettings)
+            ICustomerActivityService customerActivityService, IStoreService storeService, ILanguageService languageService, IDateTimeHelper dateTimeHelper, SeoSettings seoSettings)
         {
             _topicTemplateService = topicTemplateService;
             _topicService = topicService;
@@ -35,6 +37,7 @@ namespace Grand.Web.Areas.Admin.Services
             _customerActivityService = customerActivityService;
             _storeService = storeService;
             _languageService = languageService;
+            _dateTimeHelper = dateTimeHelper;
             _seoSettings = seoSettings;
         }
 
@@ -44,7 +47,7 @@ namespace Grand.Web.Areas.Admin.Services
             //stores
             model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = "" });
             foreach (var s in await _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString() });
+                model.AvailableStores.Add(new SelectListItem { Text = s.Shortcut, Value = s.Id.ToString() });
             return model;
         }
 
@@ -70,7 +73,7 @@ namespace Grand.Web.Areas.Admin.Services
                 model.Password = null;
             }
 
-            var topic = model.ToEntity();
+            var topic = model.ToEntity(_dateTimeHelper);
             await _topicService.InsertTopic(topic);
             //search engine name
             model.SeName = await topic.ValidateSeName(model.SeName, topic.Title ?? topic.SystemName, true, _seoSettings, _urlRecordService, _languageService);
@@ -89,7 +92,7 @@ namespace Grand.Web.Areas.Admin.Services
             {
                 model.Password = null;
             }
-            topic = model.ToEntity(topic);
+            topic = model.ToEntity(topic, _dateTimeHelper);
             topic.Locales = await model.Locales.ToLocalizedProperty(topic, x => x.Title, _seoSettings, _urlRecordService, _languageService);
             model.SeName = await topic.ValidateSeName(model.SeName, topic.Title ?? topic.SystemName, true, _seoSettings, _urlRecordService, _languageService);
             topic.SeName = model.SeName;

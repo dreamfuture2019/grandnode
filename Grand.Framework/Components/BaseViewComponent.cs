@@ -1,28 +1,28 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ViewComponents;
+using Newtonsoft.Json;
 
 namespace Grand.Framework.Components
 {
+    [BaseViewComponent(AdminAccess = false)]
     public abstract class BaseViewComponent : ViewComponent
     {
-        public new ViewViewComponentResult View<TModel>(string viewName, TModel model)
+        public new IViewComponentResult View<TModel>(string viewName, TModel model)
         {
-            //TO DO
-            //EngineContext.Current.Resolve<IEventPublisher>().ViewComponentEvent(viewName, model, this);
             return base.View<TModel>(viewName, model);
         }
 
-        public new ViewViewComponentResult View<TModel>(TModel model)
+        public new IViewComponentResult View<TModel>(TModel model)
         {
-            //TO DO
-            //EngineContext.Current.Resolve<IEventPublisher>().ViewComponentEvent(model, this);
+            var viewJson = Request?.Headers["X-Response-View"];
+            if (viewJson?.Equals("Json") ?? false)
+            {
+                return new JsonContentViewComponentResult(JsonConvert.SerializeObject(model));
+            }
             return base.View<TModel>(model);
         }
 
-        public new ViewViewComponentResult View(string viewName)
+        public new IViewComponentResult View(string viewName)
         {
-            //TO DO
-            //EngineContext.Current.Resolve<IEventPublisher>().ViewComponentEvent(viewName, this);
             return base.View(viewName);
         }
     }

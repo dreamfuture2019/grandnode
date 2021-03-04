@@ -1,5 +1,5 @@
-using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Customers;
+using Grand.Domain.Catalog;
+using Grand.Domain.Customers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -41,6 +41,20 @@ namespace Grand.Services.Catalog
 
             return source.Where(tierPrice => string.IsNullOrEmpty(tierPrice.CustomerRoleId) ||
                 customer.CustomerRoles.Where(role => role.Active).Select(role => role.Id).Contains(tierPrice.CustomerRoleId));
+        }
+
+        /// <summary>
+        /// Filter tier prices by a currency
+        /// </summary>
+        /// <param name="source">Tier prices</param>
+        /// <param name="currencyCode">currencyCode</param>
+        /// <returns>Filtered tier prices</returns>
+        public static IEnumerable<TierPrice> FilterByCurrency(this IEnumerable<TierPrice> source, string currencyCode)
+        {
+            if (source == null)
+                throw new ArgumentNullException("source");
+
+            return source.Where(tierPrice => string.IsNullOrEmpty(tierPrice.CurrencyCode) || tierPrice.CurrencyCode == currencyCode);
         }
 
         /// <summary>

@@ -1,11 +1,12 @@
 using Grand.Core;
-using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Common;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Discounts;
-using Grand.Core.Domain.Orders;
-using Grand.Core.Domain.Shipping;
-using Grand.Core.Domain.Tax;
+using Grand.Domain.Catalog;
+using Grand.Domain.Common;
+using Grand.Domain.Customers;
+using Grand.Domain.Directory;
+using Grand.Domain.Discounts;
+using Grand.Domain.Orders;
+using Grand.Domain.Shipping;
+using Grand.Domain.Tax;
 using Grand.Services.Catalog;
 using Grand.Services.Common;
 using Grand.Services.Customers;
@@ -37,7 +38,6 @@ namespace Grand.Services.Orders
         private readonly ICheckoutAttributeParser _checkoutAttributeParser;
         private readonly IDiscountService _discountService;
         private readonly IGiftCardService _giftCardService;
-        private readonly IGenericAttributeService _genericAttributeService;
         private readonly IRewardPointsService _rewardPointsService;
         private readonly IProductService _productService;
         private readonly ICurrencyService _currencyService;
@@ -63,7 +63,6 @@ namespace Grand.Services.Orders
         /// <param name="checkoutAttributeParser">Checkout attribute parser</param>
         /// <param name="discountService">Discount service</param>
         /// <param name="giftCardService">Gift card service</param>
-        /// <param name="genericAttributeService">Generic attribute service</param>
         /// <param name="rewardPointsService">Reward points service</param>
         /// <param name="currencyService">Currency service</param>
         /// <param name="taxSettings">Tax settings</param>
@@ -80,7 +79,6 @@ namespace Grand.Services.Orders
             ICheckoutAttributeParser checkoutAttributeParser,
             IDiscountService discountService,
             IGiftCardService giftCardService,
-            IGenericAttributeService genericAttributeService,
             IRewardPointsService rewardPointsService,
             IProductService productService,
             ICurrencyService currencyService,
@@ -99,7 +97,6 @@ namespace Grand.Services.Orders
             _checkoutAttributeParser = checkoutAttributeParser;
             _discountService = discountService;
             _giftCardService = giftCardService;
-            _genericAttributeService = genericAttributeService;
             _rewardPointsService = rewardPointsService;
             _productService = productService;
             _currencyService = currencyService;
@@ -147,7 +144,7 @@ namespace Grand.Services.Orders
                     }
                 }
 
-            var preferredDiscounts = await _discountService.GetPreferredDiscount(allowedDiscounts, customer, orderSubTotal);
+            var preferredDiscounts = await _discountService.GetPreferredDiscount(allowedDiscounts, customer, _workContext.WorkingCurrency, orderSubTotal);
             appliedDiscounts = preferredDiscounts.appliedDiscount;
             discountAmount = preferredDiscounts.discountAmount;
 
@@ -190,7 +187,7 @@ namespace Grand.Services.Orders
                     }
                 }
 
-            var (appliedDiscount, discountAmount) = await _discountService.GetPreferredDiscount(allowedDiscounts, customer, shippingTotal);
+            var (appliedDiscount, discountAmount) = await _discountService.GetPreferredDiscount(allowedDiscounts, customer, _workContext.WorkingCurrency, shippingTotal);
             appliedDiscounts = appliedDiscount;
             shippingDiscountAmount = discountAmount;
 
@@ -237,7 +234,7 @@ namespace Grand.Services.Orders
                         });
                     }
                 }
-            var preferredDiscount = await _discountService.GetPreferredDiscount(allowedDiscounts, customer, orderTotal);
+            var preferredDiscount = await _discountService.GetPreferredDiscount(allowedDiscounts, customer, _workContext.WorkingCurrency, orderTotal);
             appliedDiscounts = preferredDiscount.appliedDiscount;
             discountAmount = preferredDiscount.discountAmount;
 
@@ -250,6 +247,31 @@ namespace Grand.Services.Orders
                 discountAmount = RoundingHelper.RoundPrice(discountAmount, primaryCurrency);
             }
             return (discountAmount, appliedDiscounts);
+        }
+
+        /// <summary>
+        /// Get active gift cards that are applied by a customer
+        /// </summary>
+        /// <param name="customer">Customer</param>
+        /// <returns>Active gift cards</returns>
+        private async Task<IList<GiftCard>> GetActiveGiftCards(Customer customer, Currency currency)
+        {
+            var result = new List<GiftCard>();
+            if (customer == null)
+                return result;
+
+            string[] couponCodes = customer.ParseAppliedCouponCodes(SystemCustomerAttributeNames.GiftCardCoupons);
+            foreach (var couponCode in couponCodes)
+            {
+                var giftCards = await _giftCardService.GetAllGiftCards(isGiftCardActivated: true, giftCardCouponCode: couponCode);
+                foreach (var gc in giftCards)
+                {
+                    if (gc.IsGiftCardValid(currency))
+                        result.Add(gc);
+                }
+            }
+
+            return result;
         }
 
         #endregion
@@ -287,9 +309,12 @@ namespace Grand.Services.Orders
             decimal subTotalInclTaxWithoutDiscount = decimal.Zero;
             foreach (var shoppingCartItem in cart)
             {
-                var subtotal = await _priceCalculationService.GetSubTotal(shoppingCartItem);
-                decimal sciSubTotal = subtotal.subTotal;
                 var product = await _productService.GetProductById(shoppingCartItem.ProductId);
+                if (product == null)
+                    continue;
+
+                var subtotal = await _priceCalculationService.GetSubTotal(shoppingCartItem, product);
+                decimal sciSubTotal = subtotal.subTotal;
 
                 decimal taxRate;
                 var pricesExcl = await _taxService.GetProductPrice(product, sciSubTotal, false, customer);
@@ -320,18 +345,16 @@ namespace Grand.Services.Orders
             //checkout attributes
             if (customer != null)
             {
-                var checkoutAttributesXml = await customer.GetAttribute<string>(_genericAttributeService, SystemCustomerAttributeNames.CheckoutAttributes, _storeContext.CurrentStore.Id);
-                var attributeValues = await _checkoutAttributeParser.ParseCheckoutAttributeValues(checkoutAttributesXml);
-                if (attributeValues != null)
-                {
+                var checkoutAttributes = customer.GetAttributeFromEntity<List<CustomAttribute>>(SystemCustomerAttributeNames.CheckoutAttributes, _storeContext.CurrentStore.Id);
+                var attributeValues = await _checkoutAttributeParser.ParseCheckoutAttributeValue(checkoutAttributes);
                     foreach (var attributeValue in attributeValues)
                     {
                         decimal taxRate;
-                        var checkoutAttributePriceExclTax = await _taxService.GetCheckoutAttributePrice(attributeValue, false, customer);
-                        decimal caExclTax = checkoutAttributePriceExclTax.checkoutPrice;
+                        var checkoutAttributePriceExclTax = await _taxService.GetCheckoutAttributePrice(attributeValue.ca, attributeValue.cav, false, customer);
+                        decimal caExclTax = await _currencyService.ConvertFromPrimaryStoreCurrency(checkoutAttributePriceExclTax.checkoutPrice, _workContext.WorkingCurrency);
 
-                        var checkoutAttributePriceInclTax = await _taxService.GetCheckoutAttributePrice(attributeValue, true, customer);
-                        decimal caInclTax = checkoutAttributePriceInclTax.checkoutPrice;
+                        var checkoutAttributePriceInclTax = await _taxService.GetCheckoutAttributePrice(attributeValue.ca, attributeValue.cav, true, customer);
+                        decimal caInclTax = await _currencyService.ConvertFromPrimaryStoreCurrency(checkoutAttributePriceInclTax.checkoutPrice, _workContext.WorkingCurrency);
 
                         taxRate = checkoutAttributePriceInclTax.taxRate;
 
@@ -352,7 +375,6 @@ namespace Grand.Services.Orders
                             }
                         }
                     }
-                }
             }
 
             //subtotal without discount
@@ -582,11 +604,12 @@ namespace Grand.Services.Orders
 
             ShippingOption shippingOption = null;
             if (customer != null)
-                shippingOption = await customer.GetAttribute<ShippingOption>(_genericAttributeService, SystemCustomerAttributeNames.SelectedShippingOption, _storeContext.CurrentStore.Id);
+                shippingOption = customer.GetAttributeFromEntity<ShippingOption>(SystemCustomerAttributeNames.SelectedShippingOption, _storeContext.CurrentStore.Id);
 
             if (shippingOption != null)
             {
-                var adjustshipingRate = await AdjustShippingRate(shippingOption.Rate, cart);
+                var rate = await _currencyService.ConvertFromPrimaryStoreCurrency(shippingOption.Rate, _workContext.WorkingCurrency);
+                var adjustshipingRate = await AdjustShippingRate(rate, cart);
                 shippingTotal = adjustshipingRate.shippingRate;
                 appliedDiscounts = adjustshipingRate.appliedDiscounts;
             }
@@ -673,8 +696,8 @@ namespace Grand.Services.Orders
             string paymentMethodSystemName = "";
             if (customer != null)
             {
-                paymentMethodSystemName = await customer.GetAttribute<string>(
-                    _genericAttributeService, SystemCustomerAttributeNames.SelectedPaymentMethod,
+                paymentMethodSystemName = customer.GetAttributeFromEntity<string>(
+                    SystemCustomerAttributeNames.SelectedPaymentMethod,
                     _storeContext.CurrentStore.Id);
             }
 
@@ -682,10 +705,6 @@ namespace Grand.Services.Orders
             decimal subTotalTaxTotal = decimal.Zero;
 
             var shoppingCartSubTotal = await GetShoppingCartSubTotal(cart, false);
-            decimal orderSubTotalDiscountAmount = shoppingCartSubTotal.discountAmount;
-            List<AppliedDiscount> orderSubTotalAppliedDiscounts = shoppingCartSubTotal.appliedDiscounts;
-            decimal subTotalWithoutDiscountBase = shoppingCartSubTotal.subTotalWithoutDiscount;
-            decimal subTotalWithDiscountBase = shoppingCartSubTotal.subTotalWithDiscount;
             SortedDictionary<decimal, decimal> orderSubTotalTaxRates = shoppingCartSubTotal.taxRates;
 
             foreach (KeyValuePair<decimal, decimal> kvp in orderSubTotalTaxRates)
@@ -740,6 +759,7 @@ namespace Grand.Services.Orders
             {
                 decimal taxRate;
                 decimal paymentMethodAdditionalFee = await _paymentService.GetAdditionalHandlingFee(cart, paymentMethodSystemName);
+                paymentMethodAdditionalFee = await _currencyService.ConvertFromPrimaryStoreCurrency(paymentMethodAdditionalFee, _workContext.WorkingCurrency);
 
                 var additionalFeeExclTax = await _taxService.GetPaymentMethodAdditionalFee(paymentMethodAdditionalFee, false, customer);
                 decimal paymentMethodAdditionalFeeExclTax = additionalFeeExclTax.paymentPrice;
@@ -800,10 +820,6 @@ namespace Grand.Services.Orders
             GetShoppingCartTotal(IList<ShoppingCartItem> cart, bool? useRewardPoints = null, bool usePaymentMethodAdditionalFee = true)
         {
 
-            //out decimal discountAmount, out List<AppliedDiscount> appliedDiscounts,
-            //out List<AppliedGiftCard> appliedGiftCards,
-            //out int redeemedRewardPoints, out decimal redeemedRewardPointsAmount
-
             var redeemedRewardPoints = 0;
             var redeemedRewardPointsAmount = decimal.Zero;
 
@@ -813,16 +829,13 @@ namespace Grand.Services.Orders
             string paymentMethodSystemName = "";
             if (customer != null)
             {
-                paymentMethodSystemName = await customer.GetAttribute<string>(
-                    _genericAttributeService, SystemCustomerAttributeNames.SelectedPaymentMethod,
+                paymentMethodSystemName = customer.GetAttributeFromEntity<string>(
+                    SystemCustomerAttributeNames.SelectedPaymentMethod,
                     _storeContext.CurrentStore.Id);
             }
 
             //subtotal without tax
             var subTotal = await GetShoppingCartSubTotal(cart, false);
-            decimal orderSubTotalDiscountAmount = subTotal.discountAmount;
-            List<AppliedDiscount> orderSubTotalAppliedDiscounts = subTotal.appliedDiscounts;
-            decimal subTotalWithoutDiscountBase = subTotal.subTotalWithoutDiscount;
             decimal subTotalWithDiscountBase = subTotal.subTotalWithDiscount;
 
             //subtotal with discount
@@ -834,13 +847,11 @@ namespace Grand.Services.Orders
 
             //payment method additional fee without tax
             decimal paymentMethodAdditionalFeeWithoutTax = decimal.Zero;
-            if (usePaymentMethodAdditionalFee && !String.IsNullOrEmpty(paymentMethodSystemName))
+            if (usePaymentMethodAdditionalFee && !string.IsNullOrEmpty(paymentMethodSystemName))
             {
-                decimal paymentMethodAdditionalFee = await _paymentService.GetAdditionalHandlingFee(cart,
-                    paymentMethodSystemName);
-                paymentMethodAdditionalFeeWithoutTax = (await
-                    _taxService.GetPaymentMethodAdditionalFee(paymentMethodAdditionalFee,
-                        false, customer)).paymentPrice;
+                var paymentMethodAdditionalFee = await _paymentService.GetAdditionalHandlingFee(cart, paymentMethodSystemName);
+                paymentMethodAdditionalFee = await _currencyService.ConvertFromPrimaryStoreCurrency(paymentMethodAdditionalFee, _workContext.WorkingCurrency);
+                paymentMethodAdditionalFeeWithoutTax = (await _taxService.GetPaymentMethodAdditionalFee(paymentMethodAdditionalFee, false, customer)).paymentPrice;
             }
 
             //tax
@@ -860,6 +871,7 @@ namespace Grand.Services.Orders
                 resultTemp = RoundingHelper.RoundPrice(resultTemp, currency);
             }
             #region Order total discount
+
             var totalDiscount = await GetOrderTotalDiscount(customer, resultTemp);
             var discountAmount = totalDiscount.orderTotalDiscount;
             var appliedDiscounts = totalDiscount.appliedDiscounts;
@@ -885,7 +897,7 @@ namespace Grand.Services.Orders
             if (!cart.IsRecurring())
             {
                 //we don't apply gift cards for recurring products
-                var giftCards = await customer.GetActiveGiftCardsAppliedByCustomer(_giftCardService, _genericAttributeService);
+                var giftCards = await GetActiveGiftCards(customer, _workContext.WorkingCurrency);
                 if (giftCards != null)
                     foreach (var gc in giftCards)
                         if (resultTemp > decimal.Zero)
@@ -927,7 +939,7 @@ namespace Grand.Services.Orders
             if (_rewardPointsSettings.Enabled)
             {
                 if (!useRewardPoints.HasValue)
-                    useRewardPoints = await customer.GetAttribute<bool>(_genericAttributeService, SystemCustomerAttributeNames.UseRewardPointsDuringCheckout, _storeContext.CurrentStore.Id);
+                    useRewardPoints = customer.GetAttributeFromEntity<bool>(SystemCustomerAttributeNames.UseRewardPointsDuringCheckout, _storeContext.CurrentStore.Id);
 
                 if (useRewardPoints.Value)
                 {
@@ -940,12 +952,12 @@ namespace Grand.Services.Orders
                             if (orderTotal > rewardPointsBalanceAmount)
                             {
                                 redeemedRewardPoints = rewardPointsBalance;
-                                redeemedRewardPointsAmount = rewardPointsBalanceAmount;
+                                redeemedRewardPointsAmount = await _currencyService.ConvertFromPrimaryStoreCurrency(rewardPointsBalanceAmount, _workContext.WorkingCurrency);
                             }
                             else
                             {
                                 redeemedRewardPointsAmount = orderTotal;
-                                redeemedRewardPoints = ConvertAmountToRewardPoints(redeemedRewardPointsAmount);
+                                redeemedRewardPoints = ConvertAmountToRewardPoints(await _currencyService.ConvertToPrimaryStoreCurrency(redeemedRewardPointsAmount, _workContext.WorkingCurrency));
                             }
                         }
                     }
@@ -1007,28 +1019,6 @@ namespace Grand.Services.Orders
                 return true;
 
             return rewardPoints >= _rewardPointsSettings.MinimumRewardPointsToUse;
-        }
-
-        /// <summary>
-        /// Calculate how much reward points will be earned/reduced based on certain amount spent
-        /// </summary>
-        /// <param name="customer">Customer</param>
-        /// <param name="amount">Amount (in primary store currency)</param>
-        /// <returns>umber of reward points</returns>
-        public virtual int CalculateRewardPoints(Customer customer, decimal amount)
-        {
-            if (!_rewardPointsSettings.Enabled)
-                return 0;
-
-            if (_rewardPointsSettings.PointsForPurchases_Amount <= decimal.Zero)
-                return 0;
-
-            //Ensure that reward points are applied only to registered users
-            if (customer == null || customer.IsGuest())
-                return 0;
-
-            var points = (int)Math.Truncate(amount / _rewardPointsSettings.PointsForPurchases_Amount * _rewardPointsSettings.PointsForPurchases_Points);
-            return points;
         }
 
         #endregion

@@ -28,7 +28,7 @@ namespace Grand.Core.Tests
             */
             var eventPublisher = new Mock<IMediator>();
 
-            ICacheManager icacheManager = new MemoryCacheManager(new MemoryCache(new MemoryCacheOptions { }), eventPublisher.Object);
+            ICacheBase icacheManager = new MemoryCacheBase(new MemoryCache(new MemoryCacheOptions { }), eventPublisher.Object);
             await icacheManager.SetAsync("key1001", 33, int.MaxValue);
             await icacheManager.SetAsync("key1202", 1244, int.MaxValue);
             await icacheManager.SetAsync("key1003", 512, int.MaxValue);
@@ -46,8 +46,8 @@ namespace Grand.Core.Tests
 
             await icacheManager.RemoveByPrefix(pattern);
 
-            Assert.IsNotNull(icacheManager.GetAsync<int>("key1202"));
-            Assert.IsNotNull(icacheManager.GetAsync<int>("key1204"));
+            Assert.IsNotNull(icacheManager.GetAsync<int>("key1202", async () => { return await Task.FromResult(0); }));
+            Assert.IsNotNull(icacheManager.GetAsync<int>("key1204", async () => { return await Task.FromResult(0); }));
         }
     }
 }

@@ -1,10 +1,11 @@
 using Grand.Core;
+using Grand.Domain;
 using Grand.Core.Caching;
-using Grand.Core.Data;
-using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Security;
+using Grand.Domain.Data;
+using Grand.Domain.Catalog;
 using Grand.Services.Customers;
 using Grand.Services.Events;
+using Grand.Services.Localization;
 using Grand.Services.Security;
 using Grand.Services.Stores;
 using MediatR;
@@ -15,6 +16,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Grand.Core.Caching.Constants;
 
 namespace Grand.Services.Catalog
 {
@@ -22,63 +24,7 @@ namespace Grand.Services.Catalog
     /// Category service
     /// </summary>
     public partial class CategoryService : ICategoryService
-    {
-        #region Constants
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : category ID
-        /// </remarks>
-        private const string CATEGORIES_BY_ID_KEY = "Grand.category.id-{0}";
-        /// <summary>
-        /// Key for caching 
-        /// </summary>
-        /// <remarks>
-        /// {0} : parent category ID
-        /// {1} : show hidden records?
-        /// {2} : current customer ID
-        /// {3} : store ID
-        /// {4} : include all levels (child)
-        /// </remarks>
-        private const string CATEGORIES_BY_PARENT_CATEGORY_ID_KEY = "Grand.category.byparent-{0}-{1}-{2}-{3}-{4}";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : show hidden records?
-        /// {1} : category ID
-        /// {2} : page index
-        /// {3} : page size
-        /// {4} : current customer ID
-        /// {5} : store ID
-        /// </remarks>
-        private const string PRODUCTCATEGORIES_ALLBYCATEGORYID_KEY = "Grand.productcategory.allbycategoryid-{0}-{1}-{2}-{3}-{4}-{5}";
-
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string CATEGORIES_PATTERN_KEY = "Grand.category.";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string PRODUCTCATEGORIES_PATTERN_KEY = "Grand.productcategory.";
-
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>        
-        private const string PRODUCTS_PATTERN_KEY = "Grand.product.";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : product ID
-        /// </remarks>
-        private const string PRODUCTS_BY_ID_KEY = "Grand.product.id-{0}";
-
-
-        #endregion
-
+    {        
         #region Fields
 
         private readonly IRepository<Category> _categoryRepository;
@@ -86,7 +32,7 @@ namespace Grand.Services.Catalog
         private readonly IWorkContext _workContext;
         private readonly IStoreContext _storeContext;
         private readonly IMediator _mediator;
-        private readonly ICacheManager _cacheManager;
+        private readonly ICacheBase _cacheBase;
         private readonly IStoreMappingService _storeMappingService;
         private readonly IAclService _aclService;
         private readonly CatalogSettings _catalogSettings;
@@ -102,11 +48,10 @@ namespace Grand.Services.Catalog
         /// <param name="categoryRepository">Category repository</param>
         /// <param name="workContext">Work context</param>
         /// <param name="storeContext">Store context</param>
-        /// <param name="eventPublisher">Event publisher</param>
         /// <param name="storeMappingService">Store mapping service</param>
         /// <param name="aclService">ACL service</param>
         /// <param name="catalogSettings">Catalog settings</param>
-        public CategoryService(ICacheManager cacheManager,
+        public CategoryService(ICacheBase cacheManager,
             IRepository<Category> categoryRepository,
             IRepository<Product> productRepository,
             IWorkContext workContext,
@@ -116,7 +61,7 @@ namespace Grand.Services.Catalog
             IAclService aclService,
             CatalogSettings catalogSettings)
         {
-            _cacheManager = cacheManager;
+            _cacheBase = cacheManager;
             _categoryRepository = categoryRepository;
             _productRepository = productRepository;
             _workContext = workContext;
@@ -125,6 +70,32 @@ namespace Grand.Services.Catalog
             _storeMappingService = storeMappingService;
             _aclService = aclService;
             _catalogSettings = catalogSettings;
+        }
+
+        #endregion
+
+        #region Utilities
+
+        protected IList<Category> SortCategoriesForTree(IList<Category> source, string parentId = "", bool ignoreCategoriesWithoutExistingParent = false)
+        {
+            if (source == null)
+                throw new ArgumentNullException("source");
+
+            var result = new List<Category>();
+
+            foreach (var cat in source.Where(c => c.ParentCategoryId == parentId).ToList())
+            {
+                result.Add(cat);
+                result.AddRange(SortCategoriesForTree(source, cat.Id, true));
+            }
+            if (!ignoreCategoriesWithoutExistingParent && result.Count != source.Count)
+            {
+                //find categories without parent in provided category source and insert them into result
+                foreach (var cat in source)
+                    if (result.FirstOrDefault(x => x.Id == cat.Id) == null)
+                        result.Add(cat);
+            }
+            return result;
         }
 
         #endregion
@@ -154,8 +125,8 @@ namespace Grand.Services.Catalog
 
             await _categoryRepository.DeleteAsync(category);
 
-            await _cacheManager.RemoveByPrefix(PRODUCTS_PATTERN_KEY);
-            await _cacheManager.RemoveByPrefix(CATEGORIES_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.PRODUCTS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.CATEGORIES_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityDeleted(category);
@@ -182,7 +153,7 @@ namespace Grand.Services.Catalog
 
             if ((!_catalogSettings.IgnoreAcl || (!String.IsNullOrEmpty(storeId) && !_catalogSettings.IgnoreStoreLimitations)))
             {
-                if (!_catalogSettings.IgnoreAcl)
+                if (!showHidden && !_catalogSettings.IgnoreAcl)
                 {
                     //ACL (access control list)
                     var allowedCustomerRolesIds = _workContext.CurrentCustomer.GetCustomerRoleIds();
@@ -202,7 +173,7 @@ namespace Grand.Services.Catalog
             query = query.OrderBy(c => c.ParentCategoryId).ThenBy(c => c.DisplayOrder).ThenBy(c => c.Name);
             var unsortedCategories = query.ToList();
             //sort categories
-            var sortedCategories = unsortedCategories.SortCategoriesForTree();
+            var sortedCategories = SortCategoriesForTree(unsortedCategories);
 
             //paging
             return await Task.FromResult(new PagedList<Category>(sortedCategories, pageIndex, pageSize));
@@ -220,8 +191,8 @@ namespace Grand.Services.Catalog
         {
             var storeId = _storeContext.CurrentStore.Id;
             var customer = _workContext.CurrentCustomer;
-            string key = string.Format(CATEGORIES_BY_PARENT_CATEGORY_ID_KEY, parentCategoryId, showHidden, customer.Id, storeId, includeAllLevels);
-            return await _cacheManager.GetAsync(key, async () => 
+            string key = string.Format(CacheKey.CATEGORIES_BY_PARENT_CATEGORY_ID_KEY, parentCategoryId, showHidden, customer.Id, storeId, includeAllLevels);
+            return await _cacheBase.GetAsync(key, async () =>
             {
                 var builder = Builders<Category>.Filter;
                 var filter = builder.Where(c => c.ParentCategoryId == parentCategoryId);
@@ -230,7 +201,7 @@ namespace Grand.Services.Catalog
 
                 if (!showHidden && (!_catalogSettings.IgnoreAcl || !_catalogSettings.IgnoreStoreLimitations))
                 {
-                    if (!_catalogSettings.IgnoreAcl)
+                    if (!showHidden && !_catalogSettings.IgnoreAcl)
                     {
                         //ACL (access control list)
                         var allowedCustomerRolesIds = customer.GetCustomerRoleIds();
@@ -316,8 +287,124 @@ namespace Grand.Services.Catalog
             var filter = builder.Eq(x => x.Published, true);
             filter = filter & builder.Eq(x => x.ShowOnSearchBox, true);
             var query = _categoryRepository.Collection.Find(filter).SortBy(x => x.SearchBoxDisplayOrder);
+            var categories = (await query.ToListAsync())
+                .Where(c => _aclService.Authorize(c) && _storeMappingService.Authorize(c))
+                .ToList();
 
-            return await query.ToListAsync();
+            return categories;
+        }
+
+        /// <summary>
+        /// Get category breadcrumb 
+        /// </summary>
+        /// <param name="category">Category</param>
+        /// <param name="categoryService">Category service</param>
+        /// <param name="aclService">ACL service</param>
+        /// <param name="storeMappingService">Store mapping service</param>
+        /// <param name="showHidden">A value indicating whether to load hidden records</param>
+        /// <returns>Category breadcrumb </returns>
+        public virtual async Task<IList<Category>> GetCategoryBreadCrumb(Category category, bool showHidden = false)
+        {
+            var result = new List<Category>();
+
+            //used to prevent circular references
+            var alreadyProcessedCategoryIds = new List<string>();
+
+            while (category != null && //not null                
+                (showHidden || category.Published) && //published
+                (showHidden || _aclService.Authorize(category)) && //ACL
+                (showHidden || _storeMappingService.Authorize(category)) && //Store mapping
+                !alreadyProcessedCategoryIds.Contains(category.Id)) //prevent circular references
+            {
+                result.Add(category);
+
+                alreadyProcessedCategoryIds.Add(category.Id);
+
+                category = await GetCategoryById(category.ParentCategoryId);
+            }
+            result.Reverse();
+            return result;
+        }
+
+        /// <summary>
+        /// Get category breadcrumb 
+        /// </summary>
+        /// <param name="category">Category</param>
+        /// <param name="allCategories">All categories</param>
+        /// <param name="showHidden">A value indicating whether to load hidden records</param>
+        /// <returns>Category breadcrumb </returns>
+        public virtual IList<Category> GetCategoryBreadCrumb(Category category, IList<Category> allCategories, bool showHidden = false)
+        {
+            var result = new List<Category>();
+
+            //used to prevent circular references
+            var alreadyProcessedCategoryIds = new List<string>();
+
+            while (category != null && //not null                
+                (showHidden || category.Published) && //published
+                (showHidden || _aclService.Authorize(category)) && //ACL
+                (showHidden || _storeMappingService.Authorize(category)) && //Store mapping
+                !alreadyProcessedCategoryIds.Contains(category.Id)) //prevent circular references
+            {
+                result.Add(category);
+
+                alreadyProcessedCategoryIds.Add(category.Id);
+
+                category = (from c in allCategories
+                            where c.Id == category.ParentCategoryId
+                            select c).FirstOrDefault();
+            }
+            result.Reverse();
+            return result;
+        }
+
+        /// <summary>
+        /// Get formatted category breadcrumb 
+        /// Note: ACL and store mapping is ignored
+        /// </summary>
+        /// <param name="category">Category</param>
+        /// <param name="separator">Separator</param>
+        /// <param name="languageId">Language identifier for localization</param>
+        /// <returns>Formatted breadcrumb</returns>
+        public virtual async Task<string> GetFormattedBreadCrumb(Category category, string separator = ">>", string languageId = "")
+        {
+            string result = string.Empty;
+
+            var breadcrumb = await GetCategoryBreadCrumb(category, true);
+            for (int i = 0; i <= breadcrumb.Count - 1; i++)
+            {
+                var categoryName = breadcrumb[i].GetLocalized(x => x.Name, languageId);
+                result = String.IsNullOrEmpty(result)
+                    ? categoryName
+                    : string.Format("{0} {1} {2}", result, separator, categoryName);
+            }
+
+            return result;
+        }
+        /// <summary>
+        /// Get formatted category breadcrumb 
+        /// Note: ACL and store mapping is ignored
+        /// </summary>
+        /// <param name="category">Category</param>
+        /// <param name="allCategories">All categories</param>
+        /// <param name="separator">Separator</param>
+        /// <param name="languageId">Language identifier for localization</param>
+        /// <returns>Formatted breadcrumb</returns>
+        public virtual string GetFormattedBreadCrumb(Category category,
+            IList<Category> allCategories, string separator = ">>", string languageId = "")
+        {
+            string result = string.Empty;
+
+            var breadcrumb = GetCategoryBreadCrumb(category, allCategories, true);
+            for (int i = 0; i <= breadcrumb.Count - 1; i++)
+            {
+                var categoryName = breadcrumb[i].GetLocalized(x => x.Name, languageId);
+                result = String.IsNullOrEmpty(result)
+                    ? categoryName
+                    : string.Format("{0} {1} {2}", result, separator, categoryName);
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -340,8 +427,8 @@ namespace Grand.Services.Catalog
         /// <returns>Category</returns>
         public virtual async Task<Category> GetCategoryById(string categoryId)
         {
-            string key = string.Format(CATEGORIES_BY_ID_KEY, categoryId);
-            return await _cacheManager.GetAsync(key, () => _categoryRepository.GetByIdAsync(categoryId));
+            string key = string.Format(CacheKey.CATEGORIES_BY_ID_KEY, categoryId);
+            return await _cacheBase.GetAsync(key, () => _categoryRepository.GetByIdAsync(categoryId));
         }
 
         /// <summary>
@@ -356,9 +443,8 @@ namespace Grand.Services.Catalog
             await _categoryRepository.InsertAsync(category);
 
             //cache
-            await _cacheManager.RemoveByPrefix(CATEGORIES_PATTERN_KEY);
-            await _cacheManager.RemoveByPrefix(PRODUCTCATEGORIES_PATTERN_KEY);
-            await _cacheManager.RemoveByPrefix(PRODUCTS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.CATEGORIES_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.PRODUCTS_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityInserted(category);
@@ -390,9 +476,8 @@ namespace Grand.Services.Catalog
             await _categoryRepository.UpdateAsync(category);
 
             //cache
-            await _cacheManager.RemoveByPrefix(CATEGORIES_PATTERN_KEY);
-            await _cacheManager.RemoveByPrefix(PRODUCTCATEGORIES_PATTERN_KEY);
-            await _cacheManager.RemoveByPrefix(PRODUCTS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.CATEGORIES_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.PRODUCTS_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityUpdated(category);
@@ -412,9 +497,8 @@ namespace Grand.Services.Catalog
             await _productRepository.Collection.UpdateOneAsync(new BsonDocument("_id", productCategory.ProductId), update);
 
             //cache
-            await _cacheManager.RemoveByPrefix(CATEGORIES_PATTERN_KEY);
-            await _cacheManager.RemoveByPrefix(PRODUCTCATEGORIES_PATTERN_KEY);
-            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, productCategory.ProductId));
+            await _cacheBase.RemoveByPrefix(CacheKey.PRODUCTCATEGORIES_PATTERN_KEY);
+            await _cacheBase.RemoveAsync(string.Format(CacheKey.PRODUCTS_BY_ID_KEY, productCategory.ProductId));
 
             //event notification
             await _mediator.EntityDeleted(productCategory);
@@ -435,8 +519,8 @@ namespace Grand.Services.Catalog
             if (String.IsNullOrEmpty(categoryId))
                 return new PagedList<ProductCategory>(new List<ProductCategory>(), pageIndex, pageSize);
 
-            string key = string.Format(PRODUCTCATEGORIES_ALLBYCATEGORYID_KEY, showHidden, categoryId, pageIndex, pageSize, _workContext.CurrentCustomer.Id, _storeContext.CurrentStore.Id);
-            return await _cacheManager.GetAsync(key, () =>
+            string key = string.Format(CacheKey.PRODUCTCATEGORIES_ALLBYCATEGORYID_KEY, showHidden, categoryId, pageIndex, pageSize, _workContext.CurrentCustomer.Id, _storeContext.CurrentStore.Id);
+            return await _cacheBase.GetAsync(key, () =>
             {
                 var query = _productRepository.Table.Where(x => x.ProductCategories.Any(y => y.CategoryId == categoryId));
 
@@ -464,8 +548,7 @@ namespace Grand.Services.Catalog
                 }
                 var query_productCategories = from prod in query
                                               from pc in prod.ProductCategories
-                                              select new SerializeProductCategory
-                                              {
+                                              select new SerializeProductCategory {
                                                   CategoryId = pc.CategoryId,
                                                   DisplayOrder = pc.DisplayOrder,
                                                   Id = pc.Id,
@@ -497,9 +580,8 @@ namespace Grand.Services.Catalog
             await _productRepository.Collection.UpdateOneAsync(new BsonDocument("_id", productCategory.ProductId), update);
 
             //cache
-            await _cacheManager.RemoveByPrefix(CATEGORIES_PATTERN_KEY);
-            await _cacheManager.RemoveByPrefix(PRODUCTCATEGORIES_PATTERN_KEY);
-            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, productCategory.ProductId));
+            await _cacheBase.RemoveByPrefix(CacheKey.PRODUCTCATEGORIES_PATTERN_KEY);
+            await _cacheBase.RemoveAsync(string.Format(CacheKey.PRODUCTS_BY_ID_KEY, productCategory.ProductId));
 
             //event notification
             await _mediator.EntityInserted(productCategory);
@@ -525,9 +607,8 @@ namespace Grand.Services.Catalog
             await _productRepository.Collection.UpdateManyAsync(filter, update);
 
             //cache
-            await _cacheManager.RemoveByPrefix(CATEGORIES_PATTERN_KEY);
-            await _cacheManager.RemoveByPrefix(PRODUCTCATEGORIES_PATTERN_KEY);
-            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, productCategory.ProductId));
+            await _cacheBase.RemoveByPrefix(CacheKey.PRODUCTCATEGORIES_PATTERN_KEY);
+            await _cacheBase.RemoveAsync(string.Format(CacheKey.PRODUCTS_BY_ID_KEY, productCategory.ProductId));
 
             //event notification
             await _mediator.EntityUpdated(productCategory);

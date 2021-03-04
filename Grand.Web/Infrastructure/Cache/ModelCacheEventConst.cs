@@ -41,10 +41,10 @@ namespace Grand.Web.Infrastructure.Cache
         /// <remarks>
         /// {0} : current store ID
         /// {1} : language ID
-        /// {2} : machine name
         /// </remarks>
-        public const string MANUFACTURER_HOMEPAGE_KEY = "Grand.pres.manufacturer.navigation.homepage-{0}-{1}-{2}";
+        public const string MANUFACTURER_HOMEPAGE_KEY = "Grand.pres.manufacturer.navigation.homepage-{0}-{1}";
 
+        
         /// <summary>
         /// Key for caching of manufacturer displayed on home page
         /// </summary>
@@ -52,16 +52,29 @@ namespace Grand.Web.Infrastructure.Cache
         /// {0} : customer role
         /// {1} : store ID
         /// {2} : language ID
-        /// {3} : machine name
         /// </remarks>
-        public const string MANUFACTURER_FEATURED_PRODUCT_HOMEPAGE_KEY = "Grand.pres.manufacturer.navigation.homepage-fp-{0}-{1}-{2}-{3}";
+        public const string MANUFACTURER_FEATURED_PRODUCT_HOMEPAGE_KEY = "Grand.pres.manufacturer.navigation.homepage-fp-{0}-{1}-{2}";
 
+        /// <summary>
+        /// Key for List of ManufacturerModel caching
+        /// </summary>
+        /// <remarks>
+        /// {0} : language id
+        /// {1} : comma separated list of customer roles
+        /// {2} : current store ID
+        /// </remarks>
+        public const string MANUFACTURER_ALL_MODEL_KEY = "Grand.pres.manufacturer.navigation.all-{0}-{1}-{2}";
 
         /// <summary>
         /// Key for VendorNavigationModel caching
         /// </summary>
         public const string VENDOR_NAVIGATION_MODEL_KEY = "Grand.pres.vendor.navigation";
         public const string VENDOR_NAVIGATION_PATTERN_KEY = "Grand.pres.vendor.navigation";
+
+        /// <summary>
+        /// Key for List of VendorModel caching
+        /// </summary>
+        public const string VENDOR_ALL_MODEL_KEY = "Grand.pres.vendor.navigation.all";
 
         /// <summary>
         /// Key for caching of a value indicating whether a manufacturer has featured products
@@ -141,11 +154,10 @@ namespace Grand.Web.Infrastructure.Cache
         /// {0} : roles of the current user
         /// {1} : current store ID
         /// {2} : language ID
-        /// {3} : machine name
         /// </remarks>
-        public const string CATEGORY_HOMEPAGE_KEY = "Grand.pres.category.homepage-{0}-{1}-{2}-{3}";
+        public const string CATEGORY_HOMEPAGE_KEY = "Grand.pres.category.homepage-{0}-{1}-{2}";
         public const string CATEGORY_HOMEPAGE_PATTERN_KEY = "Grand.pres.category.homepage";
-        public const string CATEGORY_FEATURED_PRODUCTS_HOMEPAGE_KEY = "Grand.pres.category.homepage-fp-{0}-{1}-{2}-{3}";
+        public const string CATEGORY_FEATURED_PRODUCTS_HOMEPAGE_KEY = "Grand.pres.category.homepage-fp-{0}-{1}-{2}";
 
         /// <summary>
         /// Key for GetChildCategoryIds method results caching
@@ -157,16 +169,6 @@ namespace Grand.Web.Infrastructure.Cache
         /// </remarks>
         public const string CATEGORY_CHILD_IDENTIFIERS_MODEL_KEY = "Grand.pres.category.childidentifiers-{0}-{1}-{2}";
         public const string CATEGORY_CHILD_IDENTIFIERS_PATTERN_KEY = "Grand.pres.category.childidentifiers";
-
-        /// <summary>
-        /// Key for SpecificationAttributeOptionFilter caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : comma separated list of specification attribute option IDs
-        /// {1} : language id
-        /// </remarks>
-        public const string SPECS_FILTER_MODEL_KEY = "Grand.pres.filter.specs-{0}-{1}";
-        public const string SPECS_FILTER_PATTERN_KEY = "Grand.pres.filter.specs";
 
         /// <summary>
         /// Key for ProductBreadcrumbModel caching
@@ -213,17 +215,6 @@ namespace Grand.Web.Infrastructure.Cache
         public const string PRODUCT_MANUFACTURERS_MODEL_KEY = "Grand.pres.product.manufacturers-{0}-{1}-{2}-{3}";
         public const string PRODUCT_MANUFACTURERS_MODEL_PRODUCT_KEY = "Grand.pres.product.manufacturers-{0}";
         public const string PRODUCT_MANUFACTURERS_PATTERN_KEY = "Grand.pres.product.manufacturers";
-
-        /// <summary>
-        /// Key for ProductSpecificationModel caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : product id
-        /// {1} : language id
-        /// </remarks>
-        public const string PRODUCT_SPECS_MODEL_KEY = "Grand.pres.product.specs-{0}-{1}";
-        public const string PRODUCT_SPECS_PATTERN_KEY = "Grand.pres.product.specs-{0}";
-        public const string PRODUCT_SPECS_PATTERN = "Grand.pres.product.specs";
 
         /// <summary>
         /// Key for CategoryTemplate caching
@@ -289,6 +280,7 @@ namespace Grand.Web.Infrastructure.Cache
         /// </remarks>
         public const string PRODUCTS_RELATED_IDS_KEY = "Grand.pres.related-{0}-{1}";
         public const string PRODUCTS_RELATED_IDS_PATTERN_KEY = "Grand.pres.related-{0}";
+        public const string PRODUCTS_RELATED_IDS_PATTERN = "Grand.pres.related";
 
         /// <summary>
         /// Key for "similar" product identifiers displayed on the product details page
@@ -299,22 +291,7 @@ namespace Grand.Web.Infrastructure.Cache
         /// </remarks>
         public const string PRODUCTS_SIMILAR_IDS_KEY = "Grand.pres.similar-{0}-{1}";
         public const string PRODUCTS_SIMILAR_IDS_PATTERN_KEY = "Grand.pres.similar-{0}";
-
-
-
-        /// <summary>
-        /// Key for product picture caching on the product details page
-        /// </summary>
-        /// <remarks>
-        /// {0} : product id
-        /// {1} : picture size
-        /// {2} : value indicating whether a default picture is displayed in case if no real picture exists
-        /// {3} : language ID ("alt" and "title" can depend on localized product name)
-        /// {4} : machine name
-        /// {5} : current store ID
-        /// </remarks>
-        public const string PRODUCT_DETAILS_PICTURES_MODEL_KEY = "Grand.pres.product.picture-{0}-{1}-{2}-{3}-{4}-{5}";
-        public const string PRODUCT_DETAILS_PICTURES_PATTERN_KEY = "Grand.pres.product.picture-{0}";
+        public const string PRODUCTS_SIMILAR_IDS_PATTERN = "Grand.pres.similar";
 
 
         /// Key for product reviews caching
@@ -324,22 +301,6 @@ namespace Grand.Web.Infrastructure.Cache
         /// {1} : current store ID
         /// </remarks>
         public const string PRODUCT_REVIEWS_MODEL_KEY = "Grand.pres.product.reviews-{0}-{1}";
-
-
-        /// <summary>
-        /// Key for cart picture caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : product Id
-        /// {1} : picture size
-        /// {2} : value indicating whether a default picture is displayed in case if no real picture exists
-        /// {3} : language ID ("alt" and "title" can depend on localized product name)
-        /// {4} : machine name
-        /// {5} : current store ID
-        /// </remarks>
-        public const string CART_PICTURE_MODEL_KEY = "Grand.pres.cart.picture-{0}-{1}-{2}-{3}-{4}-{5}";
-        public const string CART_PICTURE_PATTERN_KEY = "Grand.pres.cart.picture-{0}";
-
 
         /// <summary>
         /// Key for picture caching
@@ -381,10 +342,9 @@ namespace Grand.Web.Infrastructure.Cache
         /// <remarks>
         /// {0} : language ID
         /// {1} : current store ID
-        /// {2} : machine name
         /// </remarks>
         public const string BLOG_MONTHS_MODEL_KEY = "Grand.pres.blog.months-{0}-{1}";
-        public const string BLOG_HOMEPAGE_MODEL_KEY = "Grand.pres.blog.homepage-{0}-{1}-{2}";
+        public const string BLOG_HOMEPAGE_MODEL_KEY = "Grand.pres.blog.homepage-{0}-{1}";
         public const string BLOG_CATEGORY_MODEL_KEY = "Grand.pres.blog.category-{0}-{1}";
         public const string BLOG_PATTERN_KEY = "Grand.pres.blog";
 
@@ -406,10 +366,9 @@ namespace Grand.Web.Infrastructure.Cache
         /// {1} : picture size
         /// {2} : value indicating whether a default picture is displayed in case if no real picture exists
         /// {3} : language ID ("alt" and "title" can depend on localized category name)
-        /// {4} : machine name
-        /// {5} : current store ID
+        /// {4} : current store ID
         /// </remarks>
-        public const string NEWS_PICTURE_MODEL_KEY = "Grand.pres.news.picture-{0}-{1}-{2}-{3}-{4}-{5}";
+        public const string NEWS_PICTURE_MODEL_KEY = "Grand.pres.news.picture-{0}-{1}-{2}-{3}-{4}";
 
         /// <summary>
         /// Key for return request reasons
@@ -433,25 +392,14 @@ namespace Grand.Web.Infrastructure.Cache
         /// <summary>
         /// {0} : current store ID
         /// {1} : current theme
-        /// {2} : machine name
         /// </summary>
-        public const string STORE_LOGO_PATH = "Grand.pres.logo-{0}-{1}-{2}";
+        public const string STORE_LOGO_PATH = "Grand.pres.logo-{0}-{1}";
         public const string STORE_LOGO_PATH_PATTERN_KEY = "Grand.pres.logo";
         
         /// <summary>
         /// Key for available stores
         /// </summary>
         public const string AVAILABLE_STORES_MODEL_KEY = "Grand.pres.stores.all";
-
-        /// <summary>
-        /// Key for caching of a value indicating whether we have checkout attributes
-        /// </summary>
-        /// <remarks>
-        /// {0} : current store ID
-        /// {1} : true - all attributes, false - only shippable attributes
-        /// </remarks>
-        public const string CHECKOUTATTRIBUTES_EXIST_KEY = "Grand.pres.checkoutattributes.exist-{0}-{1}";
-        public const string CHECKOUTATTRIBUTES_PATTERN_KEY = "Grand.pres.checkoutattributes";
 
         /// <summary>
         /// Key for sitemap on the sitemap page

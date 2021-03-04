@@ -4,13 +4,12 @@ using Grand.Services.Localization;
 using Grand.Web.Areas.Admin.Extensions;
 using Grand.Web.Areas.Admin.Models.Common;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Driver;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Components
 {
-    public class CommonLanguageSelectorViewComponent : BaseViewComponent
+    public class CommonLanguageSelectorViewComponent : BaseAdminViewComponent
     {
         private readonly IWorkContext _workContext;
         private readonly ILanguageService _languageService;
@@ -22,9 +21,9 @@ namespace Grand.Web.Areas.Admin.Components
             IStoreContext storeContext
             )
         {
-            this._workContext = workContext;
-            this._languageService = languageService;
-            this._storeContext = storeContext;
+            _workContext = workContext;
+            _languageService = languageService;
+            _storeContext = storeContext;
         }
 
         public async Task<IViewComponentResult> InvokeAsync()

@@ -1,10 +1,9 @@
 using Grand.Core;
 using Grand.Core.Caching;
-using Grand.Core.Data;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Security;
-using Grand.Services.Customers;
-using Grand.Services.Localization;
+using Grand.Core.Caching.Constants;
+using Grand.Domain.Customers;
+using Grand.Domain.Data;
+using Grand.Domain.Security;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using System;
@@ -19,29 +18,12 @@ namespace Grand.Services.Security
     /// </summary>
     public partial class PermissionService : IPermissionService
     {
-        #region Constants
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : customer role ID
-        /// {1} : permission system name
-        /// </remarks>
-        private const string PERMISSIONS_ALLOWED_KEY = "Grand.permission.allowed-{0}-{1}";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string PERMISSIONS_PATTERN_KEY = "Grand.permission.";
-        #endregion
-
         #region Fields
 
         private readonly IRepository<PermissionRecord> _permissionRecordRepository;
-        private readonly ICustomerService _customerService;
+        private readonly IRepository<PermissionAction> _permissionActionRepository;
         private readonly IWorkContext _workContext;
-        private readonly ILocalizationService _localizationService;
-        private readonly ILanguageService _languageService;
-        private readonly ICacheManager _cacheManager;
+        private readonly ICacheBase _cacheBase;
 
         #endregion
 
@@ -51,24 +33,19 @@ namespace Grand.Services.Security
         /// Ctor
         /// </summary>
         /// <param name="permissionRecordRepository">Permission repository</param>
-        /// <param name="customerService">Customer service</param>
+        /// <param name="permissionActionRepository">Permission action repository</param>
         /// <param name="workContext">Work context</param>
-        /// <param name="localizationService">Localization service</param>
-        /// <param name="languageService">Language service</param>
         /// <param name="cacheManager">Cache manager</param>
-        public PermissionService(IRepository<PermissionRecord> permissionRecordRepository,
-            ICustomerService customerService,
+        public PermissionService(
+            IRepository<PermissionRecord> permissionRecordRepository,
+            IRepository<PermissionAction> permissionActionRepository,
             IWorkContext workContext,
-            ILocalizationService localizationService,
-            ILanguageService languageService,
-            ICacheManager cacheManager)
+            ICacheBase cacheManager)
         {
             _permissionRecordRepository = permissionRecordRepository;
-            _customerService = customerService;
+            _permissionActionRepository = permissionActionRepository;
             _workContext = workContext;
-            _localizationService = localizationService;
-            _languageService = languageService;
-            _cacheManager = cacheManager;
+            _cacheBase = cacheManager;
         }
 
         #endregion
@@ -86,8 +63,8 @@ namespace Grand.Services.Security
             if (string.IsNullOrEmpty(permissionRecordSystemName))
                 return false;
 
-            string key = string.Format(PERMISSIONS_ALLOWED_KEY, customerRole.Id, permissionRecordSystemName);
-            return await _cacheManager.GetAsync(key, async () =>
+            string key = string.Format(CacheKey.PERMISSIONS_ALLOWED_KEY, customerRole.Id, permissionRecordSystemName);
+            return await _cacheBase.GetAsync(key, async () =>
             {
                 var permissionRecord = await _permissionRecordRepository.Table.FirstOrDefaultAsync(x => x.SystemName == permissionRecordSystemName);
                 return permissionRecord?.CustomerRoles.Contains(customerRole.Id) ?? false;
@@ -109,7 +86,7 @@ namespace Grand.Services.Security
 
             await _permissionRecordRepository.DeleteAsync(permission);
 
-            await _cacheManager.RemoveByPrefix(PERMISSIONS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.PERMISSIONS_PATTERN_KEY);
         }
 
         /// <summary>
@@ -133,7 +110,7 @@ namespace Grand.Services.Security
                 return await Task.FromResult<PermissionRecord>(null);
 
             var query = from pr in _permissionRecordRepository.Table
-                        where  pr.SystemName == systemName
+                        where pr.SystemName == systemName
                         orderby pr.Id
                         select pr;
 
@@ -163,7 +140,7 @@ namespace Grand.Services.Security
 
             await _permissionRecordRepository.InsertAsync(permission);
 
-            await _cacheManager.RemoveByPrefix(PERMISSIONS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.PERMISSIONS_PATTERN_KEY);
         }
 
         /// <summary>
@@ -177,117 +154,9 @@ namespace Grand.Services.Security
 
             await _permissionRecordRepository.UpdateAsync(permission);
 
-            await _cacheManager.RemoveByPrefix(PERMISSIONS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.PERMISSIONS_PATTERN_KEY);
         }
 
-        /// <summary>
-        /// Install permissions
-        /// </summary>
-        /// <param name="permissionProvider">Permission provider</param>
-        public virtual async Task InstallPermissions(IPermissionProvider permissionProvider)
-        {
-            //install new permissions
-            var permissions = permissionProvider.GetPermissions();
-            foreach (var permission in permissions)
-            {
-                var permission1 = await GetPermissionRecordBySystemName(permission.SystemName);
-                if (permission1 == null)
-                {
-                    //new permission (install it)
-                    permission1 = new PermissionRecord
-                    {
-                        Name = permission.Name,
-                        SystemName = permission.SystemName,
-                        Category = permission.Category,
-                    };
-
-
-                    //default customer role mappings
-                    var defaultPermissions = permissionProvider.GetDefaultPermissions();
-                    foreach (var defaultPermission in defaultPermissions)
-                    {
-                        var customerRole = await _customerService.GetCustomerRoleBySystemName(defaultPermission.CustomerRoleSystemName);
-                        if (customerRole == null)
-                        {
-                            //new role (save it)
-                            customerRole = new CustomerRole
-                            {
-                                Name = defaultPermission.CustomerRoleSystemName,
-                                Active = true,
-                                SystemName = defaultPermission.CustomerRoleSystemName
-                            };
-                            await _customerService.InsertCustomerRole(customerRole);
-                        }
-
-
-                        var defaultMappingProvided = (from p in defaultPermission.PermissionRecords
-                                                      where p.SystemName == permission1.SystemName
-                                                      select p).Any();
-                        if (defaultMappingProvided)
-                        {
-                            permission1.CustomerRoles.Add(customerRole.Id);
-                        }
-                    }
-
-                    //save new permission
-                    await InsertPermissionRecord(permission1);
-
-                    //save localization
-                    await permission1.SaveLocalizedPermissionName(_localizationService, _languageService);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Install missing permissions
-        /// </summary>
-        /// <param name="permissionProvider">Permission provider</param>
-        public virtual async Task InstallNewPermissions(IPermissionProvider permissionProvider)
-        {
-            //install new permissions
-            var permissions = permissionProvider.GetPermissions();
-            foreach (var permission in permissions)
-            {
-                var permission1 = await GetPermissionRecordBySystemName(permission.SystemName);
-                if (permission1 == null)
-                {
-                    //new permission (install it)
-                    permission1 = new PermissionRecord {
-                        Name = permission.Name,
-                        SystemName = permission.SystemName,
-                        Category = permission.Category,
-                    };
-
-                    //save new permission
-                    await InsertPermissionRecord(permission1);
-
-                    //save localization
-                    await permission1.SaveLocalizedPermissionName(_localizationService, _languageService);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Uninstall permissions
-        /// </summary>
-        /// <param name="permissionProvider">Permission provider</param>
-        public virtual async Task UninstallPermissions(IPermissionProvider permissionProvider)
-        {
-            var permissions = permissionProvider.GetPermissions();
-            foreach (var permission in permissions)
-            {
-                var permission1 = await GetPermissionRecordBySystemName(permission.SystemName);
-                if (permission1 != null)
-                {
-                    await DeletePermissionRecord(permission1);
-
-                    //delete permission locales
-                    await permission1.DeleteLocalizedPermissionName(_localizationService, _languageService);
-                }
-            }
-
-        }
-        
         /// <summary>
         /// Authorize permission
         /// </summary>
@@ -311,7 +180,7 @@ namespace Grand.Services.Security
 
             if (customer == null)
                 return false;
-           
+
             return await Authorize(permission.SystemName, customer);
         }
 
@@ -336,7 +205,7 @@ namespace Grand.Services.Security
             if (String.IsNullOrEmpty(permissionRecordSystemName))
                 return false;
 
-            var customerRoles = customer.CustomerRoles.Where(cr => cr.Active);            
+            var customerRoles = customer.CustomerRoles.Where(cr => cr.Active);
             foreach (var role in customerRoles)
                 if (await Authorize(permissionRecordSystemName, role))
                     //yes, we have such permission
@@ -344,6 +213,81 @@ namespace Grand.Services.Security
 
             //no permission found
             return false;
+        }
+
+        /// <summary>
+        /// Gets a permission action
+        /// </summary>
+        /// <param name="systemName">Permission system name</param>
+        /// <param name="customeroleId">Customer role ident</param>
+        /// <returns>Permission action</returns>
+        public virtual async Task<IList<PermissionAction>> GetPermissionActions(string systemName, string customeroleId)
+        {
+            return await _permissionActionRepository.Table
+                    .Where(x => x.SystemName == systemName && x.CustomerRoleId == customeroleId).ToListAsync();
+        }
+
+        /// <summary>
+        /// Inserts a permission action record
+        /// </summary>
+        /// <param name="permission">Permission</param>
+        public virtual async Task InsertPermissionActionRecord(PermissionAction permissionAction)
+        {
+            if (permissionAction == null)
+                throw new ArgumentNullException("permissionAction");
+
+            //insert
+            await _permissionActionRepository.InsertAsync(permissionAction);
+            //clear cache
+            await _cacheBase.RemoveByPrefix(CacheKey.PERMISSIONS_PATTERN_KEY);
+        }
+
+        /// <summary>
+        /// Inserts a permission action record
+        /// </summary>
+        /// <param name="permission">Permission</param>
+        public virtual async Task DeletePermissionActionRecord(PermissionAction permissionAction)
+        {
+            if (permissionAction == null)
+                throw new ArgumentNullException("permissionAction");
+
+            //delete
+            await _permissionActionRepository.DeleteAsync(permissionAction);
+            //clear cache
+            await _cacheBase.RemoveByPrefix(CacheKey.PERMISSIONS_PATTERN_KEY);
+        }
+
+        /// <summary>
+        /// Authorize permission for action
+        /// </summary>
+        /// <param name="permissionRecordSystemName">Permission record system name</param>
+        /// <param name="permissionActionName">Permission action name</param>
+        /// <returns>true - authorized; otherwise, false</returns>
+        public virtual async Task<bool> AuthorizeAction(string permissionRecordSystemName, string permissionActionName)
+        {
+            if (string.IsNullOrEmpty(permissionRecordSystemName) || string.IsNullOrEmpty(permissionActionName))
+                return false;
+
+            if (!await Authorize(permissionRecordSystemName))
+                return false;
+
+            var customerRoles = _workContext.CurrentCustomer.CustomerRoles.Where(cr => cr.Active);
+            foreach (var role in customerRoles)
+            {
+                if (!await Authorize(permissionRecordSystemName, role))
+                    continue;
+
+                var key = string.Format(CacheKey.PERMISSIONS_ALLOWED_ACTION_KEY, role.Id, permissionRecordSystemName, permissionActionName);
+                var permissionAction = await _cacheBase.GetAsync(key, async () =>
+                {
+                    return await _permissionActionRepository.Table
+                        .FirstOrDefaultAsync(x => x.SystemName == permissionRecordSystemName && x.CustomerRoleId == role.Id && x.Action == permissionActionName);
+                });
+                if (permissionAction != null)
+                    return false;
+            }
+
+            return true;
         }
 
         #endregion

@@ -24,10 +24,10 @@
   </Target>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Grand.Core\Grand.Core.csproj">
+    <ProjectReference Include="..\..\Grand.Domain\Grand.Domain.csproj">
       <Private>false</Private>
     </ProjectReference>
-    <ProjectReference Include="..\..\Grand.Framework\Grand.Framework.csproj">
+    <ProjectReference Include="..\..\Grand.Core\Grand.Core.csproj">
       <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="..\..\Grand.Services\Grand.Services.csproj">
@@ -36,9 +36,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Description.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Update="logo.jpg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

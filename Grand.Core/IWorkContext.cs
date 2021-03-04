@@ -1,8 +1,8 @@
-﻿using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Directory;
-using Grand.Core.Domain.Localization;
-using Grand.Core.Domain.Tax;
-using Grand.Core.Domain.Vendors;
+﻿using Grand.Domain.Customers;
+using Grand.Domain.Directory;
+using Grand.Domain.Localization;
+using Grand.Domain.Tax;
+using Grand.Domain.Vendors;
 using System.Threading.Tasks;
 
 namespace Grand.Core
@@ -13,15 +13,21 @@ namespace Grand.Core
     public interface IWorkContext
     {
         /// <summary>
-        /// Gets or sets the current customer
+        /// Gets the current customer
         /// </summary>
-        Customer CurrentCustomer { get; set; }
+        Customer CurrentCustomer { get; }
 
         /// <summary>
         /// Set the current customer by Middleware
         /// </summary>
         /// <returns></returns>
         Task<Customer> SetCurrentCustomer();
+
+        /// <summary>
+        /// Set the current customer 
+        /// </summary>
+        /// <returns></returns>
+        Task<Customer> SetCurrentCustomer(Customer customer);
 
         /// <summary>
         /// Gets or sets the original customer (in case the current one is impersonated)

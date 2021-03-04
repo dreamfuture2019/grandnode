@@ -1,7 +1,4 @@
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Orders;
-using Grand.Core.Domain.Shipping;
-using Grand.Services.Payments;
+using Grand.Domain.Orders;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -13,65 +10,12 @@ namespace Grand.Services.Orders
     public partial interface IOrderProcessingService
     {
         /// <summary>
-        /// Send notification order 
+        /// Cancel a order
         /// </summary>
         /// <param name="order">Order</param>
-        Task SendNotification(Order order);
-
-        /// <summary>
-        /// Checks order status
-        /// </summary>
-        /// <param name="order">Order</param>
-        /// <returns>Validated order</returns>
-        Task CheckOrderStatus(Order order);
-
-        /// <summary>
-        /// Places an order
-        /// </summary>
-        /// <param name="processPaymentRequest">Process payment request</param>
-        /// <returns>Place order result</returns>
-        Task<PlaceOrderResult> PlaceOrder(ProcessPaymentRequest processPaymentRequest);
-
-        /// <summary>
-        /// Deletes an order
-        /// </summary>
-        /// <param name="order">The order</param>
-        Task DeleteOrder(Order order);
-
-
-        /// <summary>
-        /// Process next recurring psayment
-        /// </summary>
-        /// <param name="recurringPayment">Recurring payment</param>
-        Task ProcessNextRecurringPayment(RecurringPayment recurringPayment);
-
-        /// <summary>
-        /// Cancels a recurring payment
-        /// </summary>
-        /// <param name="recurringPayment">Recurring payment</param>
-        Task<IList<string>> CancelRecurringPayment(RecurringPayment recurringPayment);
-
-        /// <summary>
-        /// Gets a value indicating whether a customer can cancel recurring payment
-        /// </summary>
-        /// <param name="customerToValidate">Customer</param>
-        /// <param name="recurringPayment">Recurring Payment</param>
-        /// <returns>value indicating whether a customer can cancel recurring payment</returns>
-        Task<bool> CanCancelRecurringPayment(Customer customerToValidate, RecurringPayment recurringPayment);
-        
-        /// <summary>
-        /// Send a shipment
-        /// </summary>
-        /// <param name="shipment">Shipment</param>
-        /// <param name="notifyCustomer">True to notify customer</param>
-        Task Ship(Shipment shipment, bool notifyCustomer);
-
-        /// <summary>
-        /// Marks a shipment as delivered
-        /// </summary>
-        /// <param name="shipment">Shipment</param>
-        /// <param name="notifyCustomer">True to notify customer</param>
-        Task Deliver(Shipment shipment, bool notifyCustomer);
+        /// <param name="notifyCustomer">Notify Customer</param>
+        /// <param name="notifyStoreOwner">Notify StoreOwner</param>
+        Task CancelOrder(Order order, bool notifyCustomer = true, bool notifyStoreOwner = true);
 
         /// <summary>
         /// Gets a value indicating whether cancel is allowed
@@ -79,14 +23,6 @@ namespace Grand.Services.Orders
         /// <param name="order">Order</param>
         /// <returns>A value indicating whether cancel is allowed</returns>
         bool CanCancelOrder(Order order);
-
-        /// <summary>
-        /// Cancels order
-        /// </summary>
-        /// <param name="order">Order</param>
-        /// <param name="notifyCustomer">True to notify customer</param>
-        /// <param name="notifyStoreOwner">True to notify store owner</param>
-        Task CancelOrder(Order order, bool notifyCustomer, bool notifyStoreOwner = false);
 
         /// <summary>
         /// Gets a value indicating whether order can be marked as authorized
@@ -127,8 +63,6 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="order">Order</param>
         Task MarkOrderAsPaid(Order order);
-
-
 
         /// <summary>
         /// Gets a value indicating whether refund from admin panel is allowed
@@ -215,31 +149,5 @@ namespace Grand.Services.Orders
         /// <param name="order">Order</param>
         Task VoidOffline(Order order);
 
-        /// <summary>
-        /// Place order items in current user shopping cart.
-        /// </summary>
-        /// <param name="order">The order</param>
-        Task ReOrder(Order order);
-
-        /// <summary>
-        /// Check whether return request is allowed
-        /// </summary>
-        /// <param name="order">Order</param>
-        /// <returns>Result</returns>
-        Task<bool> IsReturnRequestAllowed(Order order);
-
-        /// <summary>
-        /// Valdiate minimum order sub-total amount
-        /// </summary>
-        /// <param name="cart">Shopping cart</param>
-        /// <returns>true - OK; false - minimum order sub-total amount is not reached</returns>
-        Task<bool> ValidateMinOrderSubtotalAmount(IList<ShoppingCartItem> cart);
-
-        /// <summary>
-        /// Valdiate minimum order total amount
-        /// </summary>
-        /// <param name="cart">Shopping cart</param>
-        /// <returns>true - OK; false - minimum order total amount is not reached</returns>
-        Task<bool> ValidateMinOrderTotalAmount(IList<ShoppingCartItem> cart);
     }
 }

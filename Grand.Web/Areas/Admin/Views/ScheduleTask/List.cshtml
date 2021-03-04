@@ -28,7 +28,7 @@
         </div>
     </div>
 </div>
-<script type="text/javascript">
+<script>
     $(document).ready(function () {
         $("#schedule-tasks-grid").on("click", ".run-now", function (e) {
             showThrobber('@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(T("Admin.System.ScheduleTasks.RunNow.Progress").Text))');
@@ -37,7 +37,7 @@
 </script>
 <div id="schedule-tasks-grid"></div>
 
-<script type="text/javascript">
+<script>
     $(document).ready(function () {
         $("#schedule-tasks-grid").kendoGrid({
             dataSource: {
@@ -135,7 +135,7 @@
                         field: "Id",
                         title: "@T("Admin.System.ScheduleTasks.RunNow")",
                         width: 100,
-                        template: '<a href="@Url.Content("~/Admin/ScheduleTask/RunNow/")#=Id#" class="k-button run-now k-button-icontext"><i class="fa fa-forward"></i> @T("Admin.System.ScheduleTasks.RunNow")</a>'
+                        template: '<a href="@Url.Action("RunNow", "ScheduleTask")/#=Id#" class="k-button run-now k-button-icontext"><i class="fa fa-forward"></i> @T("Admin.System.ScheduleTasks.RunNow")</a>'
                 }]
         });
     });

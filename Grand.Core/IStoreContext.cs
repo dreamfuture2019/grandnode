@@ -1,4 +1,4 @@
-﻿using Grand.Core.Domain.Stores;
+﻿using Grand.Domain.Stores;
 using System.Threading.Tasks;
 
 namespace Grand.Core
@@ -18,6 +18,12 @@ namespace Grand.Core
         /// </summary>
         /// <returns></returns>
         Task<Store> SetCurrentStore();
+
+        /// <summary>
+        /// Set the current store by BackgroundService
+        /// </summary>
+        /// <returns></returns>
+        Task<Store> SetCurrentStore(string storeId);
 
         /// <summary>
         /// Set store cookie

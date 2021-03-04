@@ -1,25 +1,16 @@
 ﻿using Grand.Api.DTOs.Catalog;
 using Grand.Api.DTOs.Common;
 using Grand.Api.DTOs.Customers;
-using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Common;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Media;
-using Grand.Core.Infrastructure.Mapper;
+using Grand.Domain.Catalog;
+using Grand.Domain.Common;
+using Grand.Domain.Customers;
+using Grand.Domain.Media;
+using Grand.Core.Mapper;
 
 namespace Grand.Api.Extensions
 {
     public static class MappingExtensions
     {
-        public static TDestination MapTo<TSource, TDestination>(this TSource source)
-        {
-            return AutoMapperConfiguration.Mapper.Map<TSource, TDestination>(source);
-        }
-
-        public static TDestination MapTo<TSource, TDestination>(this TSource source, TDestination destination)
-        {
-            return AutoMapperConfiguration.Mapper.Map(source, destination);
-        }
 
         #region Product
 
@@ -89,6 +80,25 @@ namespace Grand.Api.Extensions
         }
 
         public static ProductAttribute ToEntity(this ProductAttributeDto model, ProductAttribute destination)
+        {
+            return model.MapTo(destination);
+        }
+
+        #endregion
+
+        #region Product attribute mapping
+
+        public static ProductAttributeMappingDto ToModel(this ProductAttributeMapping entity)
+        {
+            return entity.MapTo<ProductAttributeMapping, ProductAttributeMappingDto>();
+        }
+
+        public static ProductAttributeMapping ToEntity(this ProductAttributeMappingDto model)
+        {
+            return model.MapTo<ProductAttributeMappingDto, ProductAttributeMapping>();
+        }
+
+        public static ProductAttributeMapping ToEntity(this ProductAttributeMappingDto model, ProductAttributeMapping destination)
         {
             return model.MapTo(destination);
         }

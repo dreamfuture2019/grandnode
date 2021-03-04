@@ -5,13 +5,13 @@ using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Components
 {
-    public class OrderOrderIncompleteReportViewComponent : BaseViewComponent
+    public class OrderOrderIncompleteReportViewComponent : BaseAdminViewComponent
     {
         private readonly IPermissionService _permissionService;
 
         public OrderOrderIncompleteReportViewComponent(IPermissionService permissionService)
         {
-            this._permissionService = permissionService;
+            _permissionService = permissionService;
         }
 
         public async Task<IViewComponentResult> InvokeAsync()

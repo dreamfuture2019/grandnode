@@ -1,6 +1,6 @@
-﻿using Grand.Core.Domain.Orders;
-using Grand.Core.Domain.Payments;
-using Grand.Core.Domain.Shipping;
+﻿using Grand.Domain.Orders;
+using Grand.Domain.Payments;
+using Grand.Domain.Shipping;
 using Grand.Framework.Components;
 using Grand.Framework.Extensions;
 using Grand.Services.Localization;
@@ -14,18 +14,18 @@ using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Components
 {
-    public class AffiliateViewComponent : BaseViewComponent
+    public class AffiliateViewComponent : BaseAdminViewComponent
     {
         private readonly ILocalizationService _localizationService;
         private readonly IPermissionService _permissionService;
 
         public AffiliateViewComponent(ILocalizationService localizationService, IPermissionService permissionService)
         {
-            this._localizationService = localizationService;
-            this._permissionService = permissionService;
+            _localizationService = localizationService;
+            _permissionService = permissionService;
         }
 
-        public async Task<IViewComponentResult> InvokeAsync(string affiliateId)//original Action name: AffiliatedOrderList
+        public async Task<IViewComponentResult> InvokeAsync(string affiliateId)
         {
             if (!await _permissionService.Authorize(StandardPermissionProvider.ManageAffiliates))
                 return Content("");

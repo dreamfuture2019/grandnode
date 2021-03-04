@@ -81,7 +81,7 @@
                 columns: [{
                     field: "Product2Name",
                     title: "@T("Admin.Catalog.Products.RelatedProducts.Fields.Product")",
-                    template: '<a class="k-link" href="@Url.Content("~/Admin/Product/Edit/")#=ProductId2#">#=kendo.htmlEncode(Product2Name)#</a>',
+                    template: '<a class="k-link" href="@Url.Action("Edit", "Product", new { id = "" })/#=ProductId2#">#=kendo.htmlEncode(Product2Name)#</a>',
                 }, {
                     field: "DisplayOrder",
                     title: "@T("Admin.Catalog.Products.RelatedProducts.Fields.DisplayOrder")",
@@ -107,7 +107,7 @@
         });
     </script>
            
-    <script type="text/javascript">
+    <script>
         $(document).ready(function () {
             $('#btnRefreshRelatedProducts').click(function () {
                 //refresh grid

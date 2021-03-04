@@ -1,5 +1,5 @@
-﻿using Grand.Core.Domain.Common;
-using Grand.Core.Domain.Orders;
+﻿using Grand.Domain.Common;
+using Grand.Domain.Orders;
 using Grand.Web.Areas.Admin.Models.Common;
 using Grand.Web.Areas.Admin.Models.Orders;
 using System.Collections.Generic;
@@ -16,7 +16,10 @@ namespace Grand.Web.Areas.Admin.Interfaces
         Task NotifyCustomer(ReturnRequest returnRequest);
         ReturnReqestListModel PrepareReturnReqestListModel();
         Task<IList<ReturnRequestModel.ReturnRequestItemModel>> PrepareReturnRequestItemModel(string returnRequestId);
-        Task<ReturnRequest> UpdateReturnRequestModel(ReturnRequest returnRequest, ReturnRequestModel model, string customAddressAttributes);
+        Task<ReturnRequest> UpdateReturnRequestModel(ReturnRequest returnRequest, ReturnRequestModel model, List<CustomAttribute> customAddressAttributes);
         Task DeleteReturnRequest(ReturnRequest returnRequest);
+        Task<IList<ReturnRequestModel.ReturnRequestNote>> PrepareReturnRequestNotes(ReturnRequest returnRequest);
+        Task InsertReturnRequestNote(ReturnRequest returnRequest, Order order, string downloadId, bool displayToCustomer, string message);
+        Task DeleteReturnRequestNote(ReturnRequest returnRequest, string id);
     }
 }

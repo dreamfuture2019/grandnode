@@ -1,4 +1,4 @@
-﻿using Grand.Core.Configuration;
+﻿using Grand.Domain.Configuration;
 
 namespace Grand.Plugin.Widgets.FacebookPixel
 {
@@ -8,5 +8,9 @@ namespace Grand.Plugin.Widgets.FacebookPixel
         public string PixelScript { get; set; }
         public string AddToCartScript { get; set; }
         public string DetailsOrderScript { get; set; }
+        public bool AllowToDisableConsentCookie { get; set; }
+        public bool ConsentDefaultState { get; set; }
+        public string ConsentName { get; set; }
+        public string ConsentDescription { get; set; }
     }
 }

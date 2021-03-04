@@ -2,7 +2,7 @@
 <div asp-validation-summary="All"></div>
 <input asp-for="Id" type="hidden" />
 
-<script type="text/javascript">
+<script>
     $(document).ready(function () {
 
         $("#@Html.FieldIdFor(model => model.SslEnabled)").click(toggleSslEnabled);
@@ -30,6 +30,13 @@
                      <span asp-validation-for="@Model.Locales[item].Name"></span>
                  </div>
              </div>
+             <div class="form-group">
+                 <admin-label asp-for="@Model.Locales[item].Shortcut" />
+                 <div class="col-md-9 col-sm-9">
+                     <admin-input asp-for="@Model.Locales[item].Shortcut" />
+                     <span asp-validation-for="@Model.Locales[item].Shortcut"></span>
+                 </div>
+             </div>
              <input asp-for="@Model.Locales[item].LanguageId" type="hidden" />
          </div>
     </div>
@@ -41,6 +48,13 @@
                  <div class="col-md-9 col-sm-9">
                      <admin-input asp-for="Name" />
                      <span asp-validation-for="Name"></span>
+                 </div>
+             </div>
+             <div class="form-group">
+                 <admin-label asp-for="Shortcut" />
+                 <div class="col-md-9 col-sm-9">
+                     <admin-input asp-for="Shortcut" />
+                     <span asp-validation-for="Shortcut"></span>
                  </div>
              </div>
          </div>
@@ -82,6 +96,13 @@
             <div class="col-md-9 col-sm-9">
                 <admin-input asp-for="Hosts" />
                 <span asp-validation-for="Hosts"></span>
+            </div>
+        </div>
+        <div class="form-group">
+            <admin-label asp-for="DefaultAdminTheme " />
+            <div class="col-md-9 col-sm-9">
+                <admin-input asp-for="DefaultAdminTheme " />
+                <span asp-validation-for="DefaultAdminTheme "></span>
             </div>
         </div>
         <div class="form-group">
@@ -152,6 +173,13 @@
             <div class="col-md-9 col-sm-9">
                 <admin-select asp-for="DefaultCountryId" asp-items="Model.AvailableCountries" />
                 <span asp-validation-for="DefaultCountryId"></span>
+            </div>
+        </div>
+        <div class="form-group">
+            <admin-label asp-for="DefaultCurrencyId" />
+            <div class="col-md-9 col-sm-9">
+                <admin-select asp-for="DefaultCurrencyId" asp-items="Model.AvailableCurrencies" />
+                <span asp-validation-for="DefaultCurrencyId"></span>
             </div>
         </div>
     </div>

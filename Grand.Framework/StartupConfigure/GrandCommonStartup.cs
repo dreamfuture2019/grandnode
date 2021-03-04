@@ -1,12 +1,13 @@
-﻿using Grand.Core.Configuration;
-using Grand.Core.Infrastructure;
+﻿using Grand.Core;
+using Grand.Core.Configuration;
 using Grand.Framework.Infrastructure.Extensions;
 using Grand.Framework.Mvc.Routing;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Localization;
-using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 using System.Collections.Generic;
 using System.Globalization;
 
@@ -35,7 +36,7 @@ namespace Grand.Framework.StartupConfigure
 
             //add options feature
             services.AddOptions();
-            
+
             //add HTTP sesion state feature
             services.AddHttpSession(config);
 
@@ -51,6 +52,10 @@ namespace Grand.Framework.StartupConfigure
             //add WebEncoderOptions
             services.AddWebEncoder();
 
+            //adddetection device
+            services.AddDetectionDevice();
+
+            //add routing
             services.AddRouting(options =>
             {
                 options.ConstraintMap["lang"] = typeof(LanguageParameterTransformer);
@@ -62,7 +67,8 @@ namespace Grand.Framework.StartupConfigure
         /// Configure the using of added middleware
         /// </summary>
         /// <param name="application">Builder for configuring an application's request pipeline</param>
-        public void Configure(IApplicationBuilder application)
+        /// <param name="webHostEnvironment">WebHostEnvironment</param>
+        public void Configure(IApplicationBuilder application, IWebHostEnvironment webHostEnvironment)
         {
             var serviceProvider = application.ApplicationServices;
             var grandConfig = serviceProvider.GetRequiredService<GrandConfig>();
@@ -126,11 +132,20 @@ namespace Grand.Framework.StartupConfigure
                 application.UseInstallUrl();
 
             //use HTTP session
-            application.UseSession();            
+            application.UseSession();
 
             //use powered by
             if (!grandConfig.IgnoreUsePoweredByMiddleware)
                 application.UsePoweredBy();
+
+            // Write streamlined request completion events, instead of the more verbose ones from the framework.
+            // To use the default framework request logging instead, remove this line and set the "Microsoft"
+            // level in appsettings.json to "Information".
+            if (grandConfig.UseSerilogRequestLogging)
+                application.UseSerilogRequestLogging();
+
+            //add responsive middleware (for detection)
+            application.UseGrandDetection();
 
             //use routing
             application.UseRouting();
@@ -140,8 +155,7 @@ namespace Grand.Framework.StartupConfigure
         /// <summary>
         /// Gets order of this startup configuration implementation
         /// </summary>
-        public int Order
-        {
+        public int Order {
             //common services should be loaded after error handlers
             get { return 100; }
         }

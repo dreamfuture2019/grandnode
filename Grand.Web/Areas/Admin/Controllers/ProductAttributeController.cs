@@ -1,4 +1,7 @@
-﻿using Grand.Framework.Kendoui;
+﻿using Grand.Core;
+using Grand.Domain.Customers;
+using Grand.Domain.Seo;
+using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
 using Grand.Framework.Mvc.Filters;
 using Grand.Framework.Security.Authorization;
@@ -6,6 +9,8 @@ using Grand.Services.Catalog;
 using Grand.Services.Localization;
 using Grand.Services.Logging;
 using Grand.Services.Security;
+using Grand.Services.Seo;
+using Grand.Services.Stores;
 using Grand.Web.Areas.Admin.Extensions;
 using Grand.Web.Areas.Admin.Models.Catalog;
 using Microsoft.AspNetCore.Mvc;
@@ -15,7 +20,7 @@ using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
-    [PermissionAuthorize(PermissionSystemName.Attributes)]
+    [PermissionAuthorize(PermissionSystemName.ProductAttributes)]
     public partial class ProductAttributeController : BaseAdminController
     {
         #region Fields
@@ -24,6 +29,10 @@ namespace Grand.Web.Areas.Admin.Controllers
         private readonly ILanguageService _languageService;
         private readonly ILocalizationService _localizationService;
         private readonly ICustomerActivityService _customerActivityService;
+        private readonly IStoreService _storeService;
+        private readonly IWorkContext _workContext;
+        private readonly SeoSettings _seoSettings;
+
         #endregion Fields
 
         #region Constructors
@@ -32,13 +41,19 @@ namespace Grand.Web.Areas.Admin.Controllers
             IProductAttributeService productAttributeService,
             ILanguageService languageService,
             ILocalizationService localizationService,
-            ICustomerActivityService customerActivityService)
+            ICustomerActivityService customerActivityService,
+            IStoreService storeService,
+            IWorkContext workContext,
+            SeoSettings seoSettings)
         {
-            this._productService = productService;
-            this._productAttributeService = productAttributeService;
-            this._languageService = languageService;
-            this._localizationService = localizationService;
-            this._customerActivityService = customerActivityService;
+            _productService = productService;
+            _productAttributeService = productAttributeService;
+            _languageService = languageService;
+            _localizationService = localizationService;
+            _customerActivityService = customerActivityService;
+            _storeService = storeService;
+            _workContext = workContext;
+            _seoSettings = seoSettings;
         }
 
         #endregion
@@ -52,6 +67,7 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         public IActionResult List() => View();
 
+        [PermissionAuthorizeAction(PermissionActionName.List)]
         [HttpPost]
         public async Task<IActionResult> List(DataSourceRequest command)
         {
@@ -65,22 +81,33 @@ namespace Grand.Web.Areas.Admin.Controllers
 
             return Json(gridModel);
         }
-        
+
         //create
+        [PermissionAuthorizeAction(PermissionActionName.Create)]
         public async Task<IActionResult> Create()
         {
             var model = new ProductAttributeModel();
+            //Stores
+            await model.PrepareStoresMappingModel(null, _storeService, false, _workContext.CurrentCustomer.StaffStoreId);
             //locales
             await AddLocales(_languageService, model.Locales);
             return View(model);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Create)]
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
         public async Task<IActionResult> Create(ProductAttributeModel model, bool continueEditing)
         {
             if (ModelState.IsValid)
             {
                 var productAttribute = model.ToEntity();
+                productAttribute.SeName = SeoExtensions.GetSeName(string.IsNullOrEmpty(productAttribute.SeName) ? productAttribute.Name : productAttribute.SeName, _seoSettings);
+                if (_workContext.CurrentCustomer.IsStaff())
+                {
+                    model.LimitedToStores = true;
+                    model.SelectedStoreIds = new string[] { _workContext.CurrentCustomer.StaffStoreId };
+                }
+
                 await _productAttributeService.InsertProductAttribute(productAttribute);
 
                 //activity log
@@ -89,12 +116,15 @@ namespace Grand.Web.Areas.Admin.Controllers
                 SuccessNotification(_localizationService.GetResource("Admin.Catalog.Attributes.ProductAttributes.Added"));
                 return continueEditing ? RedirectToAction("Edit", new { id = productAttribute.Id }) : RedirectToAction("List");
             }
-
             //If we got this far, something failed, redisplay form
+            //Stores
+            await model.PrepareStoresMappingModel(null, _storeService, true);
+
             return View(model);
         }
 
         //edit
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         public async Task<IActionResult> Edit(string id)
         {
             var productAttribute = await _productAttributeService.GetProductAttributeById(id);
@@ -110,9 +140,13 @@ namespace Grand.Web.Areas.Admin.Controllers
                 locale.Description = productAttribute.GetLocalized(x => x.Description, languageId, false, false);
             });
 
+            //Stores
+            await model.PrepareStoresMappingModel(productAttribute, _storeService, false, _workContext.CurrentCustomer.StaffStoreId);
+
             return View(model);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
         public async Task<IActionResult> Edit(ProductAttributeModel model, bool continueEditing)
         {
@@ -124,6 +158,12 @@ namespace Grand.Web.Areas.Admin.Controllers
             if (ModelState.IsValid)
             {
                 productAttribute = model.ToEntity(productAttribute);
+                productAttribute.SeName = SeoExtensions.GetSeName(string.IsNullOrEmpty(productAttribute.SeName) ? productAttribute.Name : productAttribute.SeName, _seoSettings);
+                if (_workContext.CurrentCustomer.IsStaff())
+                {
+                    model.LimitedToStores = true;
+                    model.SelectedStoreIds = new string[] { _workContext.CurrentCustomer.StaffStoreId };
+                }
                 await _productAttributeService.UpdateProductAttribute(productAttribute);
 
                 //activity log
@@ -140,11 +180,23 @@ namespace Grand.Web.Areas.Admin.Controllers
                 return RedirectToAction("List");
 
             }
+
             //If we got this far, something failed, redisplay form
+            //Stores
+            await model.PrepareStoresMappingModel(productAttribute, _storeService, false, _workContext.CurrentCustomer.StaffStoreId);
+
+            // locales
+            await AddLocales(_languageService, model.Locales, (locale, languageId) =>
+            {
+                locale.Name = productAttribute.GetLocalized(x => x.Name, languageId, false, false);
+                locale.Description = productAttribute.GetLocalized(x => x.Description, languageId, false, false);
+            });
+
             return View(model);
         }
 
         //delete
+        [PermissionAuthorizeAction(PermissionActionName.Delete)]
         [HttpPost]
         public async Task<IActionResult> Delete(string id)
         {
@@ -171,6 +223,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region Used by products
 
         //used by products
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         [HttpPost]
         public async Task<IActionResult> UsedByProducts(DataSourceRequest command, string productAttributeId)
         {
@@ -193,10 +246,11 @@ namespace Grand.Web.Areas.Admin.Controllers
             };
             return Json(gridModel);
         }
-        
+
         #endregion
 
         #region Predefined values
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         [HttpPost]
         public async Task<IActionResult> PredefinedProductAttributeValueList(string productAttributeId, DataSourceRequest command)
         {
@@ -211,6 +265,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         //create
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public async Task<IActionResult> PredefinedProductAttributeValueCreatePopup(string productAttributeId)
         {
             var productAttribute = await _productAttributeService.GetProductAttributeById(productAttributeId);
@@ -228,6 +283,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return View(model);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         public async Task<IActionResult> PredefinedProductAttributeValueCreatePopup(PredefinedProductAttributeValueModel model)
         {
@@ -249,6 +305,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         //edit
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         public async Task<IActionResult> PredefinedProductAttributeValueEditPopup(string id, string productAttributeId)
         {
             var ppav = (await _productAttributeService.GetProductAttributeById(productAttributeId)).PredefinedProductAttributeValues.Where(x=>x.Id == id).FirstOrDefault();
@@ -264,6 +321,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return View(model);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         public async Task<IActionResult> PredefinedProductAttributeValueEditPopup(PredefinedProductAttributeValueModel model)
         {
@@ -285,6 +343,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         //delete
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         public async Task<IActionResult> PredefinedProductAttributeValueDelete(string id)
         {

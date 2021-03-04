@@ -1,14 +1,23 @@
-﻿using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Common;
-using Grand.Core.Domain.Courses;
-using Grand.Core.Domain.Localization;
+﻿using Grand.Domain.Catalog;
+using Grand.Domain.Common;
+using Grand.Domain.Courses;
+using Grand.Domain.Customers;
+using Grand.Domain.Localization;
+using Grand.Domain.Polls;
+using Grand.Domain.Topics;
+using Grand.Services.Helpers;
 using Grand.Services.Localization;
 using Grand.Services.Seo;
 using Grand.Web.Models.Catalog;
 using Grand.Web.Models.Common;
 using Grand.Web.Models.Course;
+using Grand.Web.Models.Polls;
+using Grand.Web.Models.Topics;
 using Grand.Web.Models.Vendors;
+using Microsoft.AspNetCore.Http;
 using System;
+using System.Globalization;
+using System.Linq;
 
 namespace Grand.Web.Extensions
 {
@@ -25,6 +34,7 @@ namespace Grand.Web.Extensions
                 ParentCategoryId = entity.ParentCategoryId,
                 Name = entity.GetLocalized(x => x.Name, language.Id),
                 Description = entity.GetLocalized(x => x.Description, language.Id),
+                BottomDescription = entity.GetLocalized(x => x.BottomDescription, language.Id),
                 MetaKeywords = entity.GetLocalized(x => x.MetaKeywords, language.Id),
                 MetaDescription = entity.GetLocalized(x => x.MetaDescription, language.Id),
                 MetaTitle = entity.GetLocalized(x => x.MetaTitle, language.Id),
@@ -43,11 +53,11 @@ namespace Grand.Web.Extensions
             if (entity == null)
                 return null;
 
-            var model = new ManufacturerModel
-            {
+            var model = new ManufacturerModel {
                 Id = entity.Id,
                 Name = entity.GetLocalized(x => x.Name, language.Id),
                 Description = entity.GetLocalized(x => x.Description, language.Id),
+                BottomDescription = entity.GetLocalized(x => x.BottomDescription, language.Id),
                 MetaKeywords = entity.GetLocalized(x => x.MetaKeywords, language.Id),
                 MetaDescription = entity.GetLocalized(x => x.MetaDescription, language.Id),
                 MetaTitle = entity.GetLocalized(x => x.MetaTitle, language.Id),
@@ -76,6 +86,61 @@ namespace Grand.Web.Extensions
                 GenericAttributes = entity.GenericAttributes
             };
             return model;
+        }
+
+        //poll
+        public static PollModel ToModel(this Poll entity, Language language, Customer customer)
+        {
+            if (entity == null)
+                return null;
+
+            var model = new PollModel {
+                Id = entity.Id,
+                Name = entity.GetLocalized(x => x.Name, language.Id)
+            };
+            model.AlreadyVoted = entity.
+                PollAnswers.Any(x => x.PollVotingRecords.Any(z => z.CustomerId == customer.Id));
+
+            var answers = entity.PollAnswers.OrderBy(x => x.DisplayOrder);
+            foreach (var answer in answers)
+                model.TotalVotes += answer.NumberOfVotes;
+            foreach (var pa in answers)
+            {
+                model.Answers.Add(new PollAnswerModel {
+                    Id = pa.Id,
+                    PollId = entity.Id,
+                    Name = pa.GetLocalized(x => x.Name, language.Id),
+                    NumberOfVotes = pa.NumberOfVotes,
+                    PercentOfTotalVotes = model.TotalVotes > 0 ? ((Convert.ToDouble(pa.NumberOfVotes) / Convert.ToDouble(model.TotalVotes)) * Convert.ToDouble(100)) : 0,
+                });
+            }
+
+            return model;
+
+        }
+
+        //topic
+        public static TopicModel ToModel(this Topic entity, Language language, IDateTimeHelper dateTimeHelper, string password = "")
+        {
+            var model = new TopicModel {
+                Id = entity.Id,
+                SystemName = entity.SystemName,
+                IncludeInSitemap = entity.IncludeInSitemap,
+                IsPasswordProtected = entity.IsPasswordProtected,
+                Password = (entity.Password == password) ? password : "",
+                Title = entity.IsPasswordProtected && !(entity.Password == password) ? "" : entity.GetLocalized(x => x.Title, language.Id),
+                Body = entity.IsPasswordProtected && !(entity.Password == password) ? "" : entity.GetLocalized(x => x.Body, language.Id),
+                MetaKeywords = entity.GetLocalized(x => x.MetaKeywords, language.Id),
+                MetaDescription = entity.GetLocalized(x => x.MetaDescription, language.Id),
+                MetaTitle = entity.GetLocalized(x => x.MetaTitle, language.Id),
+                SeName = entity.GetSeName(language.Id),
+                TopicTemplateId = entity.TopicTemplateId,
+                Published = entity.Published,
+                StartDate = entity.StartDateUtc.HasValue ? dateTimeHelper.ConvertToUserTime(entity.StartDateUtc.Value) : default,
+                EndDate = entity.EndDateUtc.HasValue ? dateTimeHelper.ConvertToUserTime(entity.EndDateUtc.Value) : default
+            };
+            return model;
+
         }
 
         public static Address ToEntity(this AddressModel model, bool trimFields = true)
@@ -130,7 +195,7 @@ namespace Grand.Web.Extensions
             destination.ZipPostalCode = model.ZipPostalCode;
             destination.PhoneNumber = model.PhoneNumber;
             destination.FaxNumber = model.FaxNumber;
-            
+
             return destination;
         }
 
@@ -167,6 +232,28 @@ namespace Grand.Web.Extensions
             destination.FaxNumber = model.FaxNumber;
 
             return destination;
+        }
+
+        public static void ParseReservationDates(this Product product, IFormCollection form,
+            out DateTime? startDate, out DateTime? endDate)
+        {
+            startDate = null;
+            endDate = null;
+
+            string startControlId = string.Format("reservationDatepickerFrom_{0}", product.Id);
+            string endControlId = string.Format("reservationDatepickerTo_{0}", product.Id);
+            var ctrlStartDate = form[startControlId];
+            var ctrlEndDate = form[endControlId];
+            try
+            {
+                //currenly we support only this format (as in the \Views\Product\_RentalInfo.cshtml file)
+                const string datePickerFormat = "MM/dd/yyyy";
+                startDate = DateTime.ParseExact(ctrlStartDate, datePickerFormat, CultureInfo.InvariantCulture);
+                endDate = DateTime.ParseExact(ctrlEndDate, datePickerFormat, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+            }
         }
     }
 }

@@ -5,13 +5,13 @@ using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Components
 {
-    public class CommonPopularSearchTermsReportViewComponent : BaseViewComponent
+    public class CommonPopularSearchTermsReportViewComponent : BaseAdminViewComponent
     {
         private readonly IPermissionService _permissionService;
 
         public CommonPopularSearchTermsReportViewComponent(IPermissionService permissionService)
         {
-            this._permissionService = permissionService;
+            _permissionService = permissionService;
         }
 
         public async Task<IViewComponentResult> InvokeAsync()

@@ -1,15 +1,17 @@
-﻿using Grand.Core;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Directory;
-using Grand.Core.Domain.Discounts;
-using Grand.Core.Domain.Seo;
-using Grand.Core.Domain.Vendors;
+﻿using Grand.Domain;
+using Grand.Domain.Customers;
+using Grand.Domain.Directory;
+using Grand.Domain.Discounts;
+using Grand.Domain.Seo;
+using Grand.Domain.Vendors;
+using Grand.Services.Common;
 using Grand.Services.Customers;
 using Grand.Services.Directory;
 using Grand.Services.Discounts;
 using Grand.Services.Helpers;
 using Grand.Services.Localization;
 using Grand.Services.Media;
+using Grand.Services.Notifications.Vendors;
 using Grand.Services.Seo;
 using Grand.Services.Stores;
 using Grand.Services.Vendors;
@@ -45,7 +47,7 @@ namespace Grand.Web.Areas.Admin.Services
 
         public VendorViewModelService(IDiscountService discountService, IVendorService vendorService, ICustomerService customerService, ILocalizationService localizationService,
             IDateTimeHelper dateTimeHelper, ICountryService countryService, IStateProvinceService stateProvinceService, IStoreService storeService, IUrlRecordService urlRecordService,
-            IPictureService pictureService, IMediator mediator, VendorSettings vendorSettings, ILanguageService languageService, 
+            IPictureService pictureService, IMediator mediator, VendorSettings vendorSettings, ILanguageService languageService,
             SeoSettings seoSettings)
         {
             _discountService = discountService;
@@ -68,7 +70,7 @@ namespace Grand.Web.Areas.Admin.Services
         {
             if (model == null)
                 throw new ArgumentNullException("model");
-            
+
             model.AvailableDiscounts = (await _discountService
                 .GetAllDiscounts(DiscountType.AssignedToVendors, showHidden: true))
                 .Select(d => d.ToModel(_dateTimeHelper))
@@ -102,7 +104,7 @@ namespace Grand.Web.Areas.Admin.Services
             {
                 model.Title = vendorReview.Title;
                 if (formatReviewText)
-                    model.ReviewText = Core.Html.HtmlHelper.FormatText(vendorReview.ReviewText, false, true, false, false, false, false);
+                    model.ReviewText = FormatText.ConvertText(vendorReview.ReviewText);
                 else
                     model.ReviewText = vendorReview.ReviewText;
                 model.IsApproved = vendorReview.IsApproved;
@@ -153,17 +155,15 @@ namespace Grand.Web.Areas.Admin.Services
 
         public virtual async Task PrepareStore(VendorModel model)
         {
-            model.AvailableStores.Add(new SelectListItem
-            {
+            model.AvailableStores.Add(new SelectListItem {
                 Text = "[None]",
                 Value = ""
             });
 
             foreach (var s in await _storeService.GetAllStores())
             {
-                model.AvailableStores.Add(new SelectListItem
-                {
-                    Text = s.Name,
+                model.AvailableStores.Add(new SelectListItem {
+                    Text = s.Shortcut,
                     Value = s.Id.ToString()
                 });
             }
@@ -193,8 +193,7 @@ namespace Grand.Web.Areas.Admin.Services
         {
             return (await _customerService
                 .GetAllCustomers(vendorId: vendorId))
-                .Select(c => new VendorModel.AssociatedCustomerInfo()
-                {
+                .Select(c => new VendorModel.AssociatedCustomerInfo() {
                     Id = c.Id,
                     Email = c.Email
                 })
@@ -288,8 +287,7 @@ namespace Grand.Web.Areas.Admin.Services
             foreach (var vendorNote in vendor.VendorNotes
                 .OrderByDescending(vn => vn.CreatedOnUtc))
             {
-                vendorNoteModels.Add(new VendorModel.VendorNote
-                {
+                vendorNoteModels.Add(new VendorModel.VendorNote {
                     Id = vendorNote.Id,
                     VendorId = vendor.Id,
                     Note = vendorNote.FormatVendorNoteText(),
@@ -304,8 +302,7 @@ namespace Grand.Web.Areas.Admin.Services
             if (vendor == null)
                 return false;
 
-            var vendorNote = new VendorNote
-            {
+            var vendorNote = new VendorNote {
                 Note = message,
                 VendorId = vendorId,
                 CreatedOnUtc = DateTime.UtcNow,

@@ -1,8 +1,6 @@
-﻿using FluentValidation.Attributes;
-using Grand.Framework.Mvc.ModelBinding;
-using Grand.Framework.Mvc.Models;
+﻿using Grand.Core.ModelBinding;
+using Grand.Core.Models;
 using Grand.Web.Models.Newsletter;
-using Grand.Web.Validators.Customer;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System;
 using System.Collections.Generic;
@@ -10,8 +8,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Grand.Web.Models.Customer
 {
-    [Validator(typeof(RegisterValidator))]
-    public partial class RegisterModel : BaseGrandModel
+    public partial class RegisterModel : BaseModel
     {
         public RegisterModel()
         {
@@ -21,7 +18,7 @@ namespace Grand.Web.Models.Customer
             CustomerAttributes = new List<CustomerAttributeModel>();
             NewsletterCategories = new List<NewsletterSimpleCategory>();
         }
-
+        [DataType(DataType.EmailAddress)]
         [GrandResourceDisplayName("Account.Fields.Email")]
         public string Email { get; set; }
 
@@ -112,18 +109,20 @@ namespace Grand.Web.Models.Customer
 
         public bool PhoneEnabled { get; set; }
         public bool PhoneRequired { get; set; }
+        [DataType(DataType.PhoneNumber)]
         [GrandResourceDisplayName("Account.Fields.Phone")]
         public string Phone { get; set; }
 
         public bool FaxEnabled { get; set; }
         public bool FaxRequired { get; set; }
+
         [GrandResourceDisplayName("Account.Fields.Fax")]
         public string Fax { get; set; }
-        
+
         public bool NewsletterEnabled { get; set; }
         [GrandResourceDisplayName("Account.Fields.Newsletter")]
         public bool Newsletter { get; set; }
-        
+
         public bool AcceptPrivacyPolicyEnabled { get; set; }
 
         //time zone
@@ -136,8 +135,7 @@ namespace Grand.Web.Models.Customer
         [GrandResourceDisplayName("Account.Fields.VatNumber")]
         public string VatNumber { get; set; }
         public bool DisplayVatNumber { get; set; }
-
-        public bool HoneypotEnabled { get; set; }
+        
         public bool DisplayCaptcha { get; set; }
 
         public IList<CustomerAttributeModel> CustomerAttributes { get; set; }

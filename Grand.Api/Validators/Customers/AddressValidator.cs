@@ -1,7 +1,7 @@
 ﻿using FluentValidation;
 using Grand.Api.DTOs.Customers;
-using Grand.Core.Domain.Common;
-using Grand.Framework.Validators;
+using Grand.Domain.Common;
+using Grand.Core.Validators;
 using Grand.Services.Directory;
 using Grand.Services.Localization;
 using System;

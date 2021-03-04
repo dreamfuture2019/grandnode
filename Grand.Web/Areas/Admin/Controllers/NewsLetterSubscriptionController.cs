@@ -1,9 +1,9 @@
 ﻿using Grand.Core;
+using Grand.Domain.Customers;
 using Grand.Framework.Controllers;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
 using Grand.Framework.Security.Authorization;
-using Grand.Services.Customers;
 using Grand.Services.ExportImport;
 using Grand.Services.Helpers;
 using Grand.Services.Localization;
@@ -31,27 +31,27 @@ namespace Grand.Web.Areas.Admin.Controllers
         private readonly IDateTimeHelper _dateTimeHelper;
         private readonly ILocalizationService _localizationService;
         private readonly IStoreService _storeService;
-        private readonly ICustomerService _customerService;
         private readonly IExportManager _exportManager;
         private readonly IImportManager _importManager;
+        private readonly IWorkContext _workContext;
 
         public NewsLetterSubscriptionController(INewsLetterSubscriptionService newsLetterSubscriptionService,
             INewsletterCategoryService newsletterCategoryService,
             IDateTimeHelper dateTimeHelper,
             ILocalizationService localizationService,
             IStoreService storeService,
-            ICustomerService customerService,
             IExportManager exportManager,
-            IImportManager importManager)
+            IImportManager importManager,
+            IWorkContext workContext)
         {
-            this._newsLetterSubscriptionService = newsLetterSubscriptionService;
-            this._newsletterCategoryService = newsletterCategoryService;
-            this._dateTimeHelper = dateTimeHelper;
-            this._localizationService = localizationService;
-            this._storeService = storeService;
-            this._customerService = customerService;
-            this._exportManager = exportManager;
-            this._importManager = importManager;
+            _newsLetterSubscriptionService = newsLetterSubscriptionService;
+            _newsletterCategoryService = newsletterCategoryService;
+            _dateTimeHelper = dateTimeHelper;
+            _localizationService = localizationService;
+            _storeService = storeService;
+            _exportManager = exportManager;
+            _importManager = importManager;
+            _workContext = workContext;
         }
 
         [NonAction]
@@ -81,24 +81,23 @@ namespace Grand.Web.Areas.Admin.Controllers
         {
             var model = new NewsLetterSubscriptionListModel();
 
+            var storeId = _workContext.CurrentCustomer.StaffStoreId;
+
             //stores
             model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = " " });
-            foreach (var s in await _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString() });
+            foreach (var s in (await _storeService.GetAllStores()).Where(x => x.Id == storeId || string.IsNullOrWhiteSpace(storeId)))
+                model.AvailableStores.Add(new SelectListItem { Text = s.Shortcut, Value = s.Id.ToString() });
 
             //active
-            model.ActiveList.Add(new SelectListItem
-            {
+            model.ActiveList.Add(new SelectListItem {
                 Value = " ",
                 Text = _localizationService.GetResource("Admin.Promotions.NewsLetterSubscriptions.List.SearchActive.All")
             });
-            model.ActiveList.Add(new SelectListItem
-            {
+            model.ActiveList.Add(new SelectListItem {
                 Value = "1",
                 Text = _localizationService.GetResource("Admin.Promotions.NewsLetterSubscriptions.List.SearchActive.ActiveOnly")
             });
-            model.ActiveList.Add(new SelectListItem
-            {
+            model.ActiveList.Add(new SelectListItem {
                 Value = "2",
                 Text = _localizationService.GetResource("Admin.Promotions.NewsLetterSubscriptions.List.SearchActive.NotActiveOnly")
             });
@@ -109,6 +108,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return View(model);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.List)]
         [HttpPost]
         public async Task<IActionResult> SubscriptionList(DataSourceRequest command, NewsLetterSubscriptionListModel model, string[] searchCategoryIds)
         {
@@ -118,6 +118,11 @@ namespace Grand.Web.Areas.Admin.Controllers
             else if (model.ActiveId == 2)
                 isActive = false;
 
+            if (_workContext.CurrentCustomer.IsStaff())
+            {
+                model.StoreId = _workContext.CurrentCustomer.StaffStoreId;
+            }
+
             var newsletterSubscriptions = await _newsLetterSubscriptionService.GetAllNewsLetterSubscriptions(model.SearchEmail,
                 model.StoreId, isActive, searchCategoryIds, command.Page - 1, command.PageSize);
             var items = new List<NewsLetterSubscriptionModel>();
@@ -125,13 +130,12 @@ namespace Grand.Web.Areas.Admin.Controllers
             {
                 var m = x.ToModel();
                 var store = await _storeService.GetStoreById(x.StoreId);
-                m.StoreName = store != null ? store.Name : "Unknown store";
+                m.StoreName = store != null ? store.Shortcut : "Unknown store";
                 m.CreatedOn = _dateTimeHelper.ConvertToUserTime(x.CreatedOnUtc, DateTimeKind.Utc).ToString();
                 m.Categories = await GetCategoryNames(x.Categories.ToList());
                 items.Add(m);
             }
-            var gridModel = new DataSourceResult
-            {
+            var gridModel = new DataSourceResult {
                 Data = items,
                 Total = newsletterSubscriptions.TotalCount
             };
@@ -139,6 +143,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         public async Task<IActionResult> SubscriptionUpdate(NewsLetterSubscriptionModel model)
         {
@@ -155,6 +160,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return new NullJsonResult();
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Delete)]
         [HttpPost]
         public async Task<IActionResult> SubscriptionDelete(string id)
         {
@@ -166,6 +172,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return new NullJsonResult();
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Export)]
         [HttpPost, ActionName("List")]
         [FormValueRequired("exportcsv")]
         public async Task<IActionResult> ExportCsv(NewsLetterSubscriptionListModel model, string[] searchCategoryIds)
@@ -176,6 +183,11 @@ namespace Grand.Web.Areas.Admin.Controllers
             else if (model.ActiveId == 2)
                 isActive = false;
 
+            if (_workContext.CurrentCustomer.IsStaff())
+            {
+                model.StoreId = _workContext.CurrentCustomer.StaffStoreId;
+            }
+
             var subscriptions = await _newsLetterSubscriptionService.GetAllNewsLetterSubscriptions(model.SearchEmail,
                 model.StoreId, isActive, searchCategoryIds);
 
@@ -185,6 +197,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return File(Encoding.UTF8.GetBytes(result), "text/csv", fileName);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Import)]
         [HttpPost]
         public async Task<IActionResult> ImportCsv(IFormFile importcsvfile)
         {

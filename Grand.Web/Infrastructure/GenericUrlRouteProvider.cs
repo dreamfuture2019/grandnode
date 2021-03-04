@@ -1,11 +1,10 @@
-﻿using Grand.Core.Data;
-using Grand.Core.Domain.Localization;
+﻿using Grand.Core.Configuration;
+using Grand.Core.Data;
+using Grand.Core.Routing;
 using Grand.Framework.Mvc.Routing;
-using Grand.Services.Localization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using System.Linq;
 
 namespace Grand.Web.Infrastructure
 {
@@ -16,16 +15,15 @@ namespace Grand.Web.Infrastructure
             var pattern = "{SeName}";
             if (DataSettingsHelper.DatabaseIsInstalled())
             {
-                var localizationSettings = routeBuilder.ServiceProvider.GetRequiredService<LocalizationSettings>();
-                if (localizationSettings.SeoFriendlyUrlsForLanguagesEnabled)
+                var config = routeBuilder.ServiceProvider.GetRequiredService<GrandConfig>();
+                if (config.SeoFriendlyUrlsForLanguagesEnabled)
                 {
-                    var langservice = routeBuilder.ServiceProvider.GetRequiredService<ILanguageService>();
-                    var languages = langservice.GetAllLanguages().GetAwaiter().GetResult();
-                    pattern = "{language:lang=" + languages.FirstOrDefault().UniqueSeoCode + "}/{SeName}";
+                    pattern = $"{{language:lang={config.SeoFriendlyUrlsDefaultCode}}}/{{**SeName}}";
                 }
+
             }
             routeBuilder.MapDynamicControllerRoute<SlugRouteTransformer>(pattern);
-
+            
             //and default one
             routeBuilder.MapControllerRoute(
                 name: "Default",
@@ -87,6 +85,7 @@ namespace Grand.Web.Infrastructure
                 name: "Course",
                 pattern: pattern,
                 new { controller = "Course", action = "Details" });
+            
         }
 
         public int Priority {

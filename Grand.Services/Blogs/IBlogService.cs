@@ -1,5 +1,5 @@
-using Grand.Core;
-using Grand.Core.Domain.Blogs;
+using Grand.Domain;
+using Grand.Domain.Blogs;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -111,6 +111,20 @@ namespace Grand.Services.Blogs
         /// <param name="blogCategoryId">Blog category id</param>
         /// <returns></returns>
         Task<BlogCategory> GetBlogCategoryById(string blogCategoryId);
+
+        /// <summary>
+        /// Get categories by post id
+        /// </summary>
+        /// <param name="blogPostId">Blog post id</param>
+        /// <returns></returns>
+        Task<IList<BlogCategory>> GetBlogCategoryByPostId(string blogPostId);
+
+        /// <summary>
+        /// Get category by sename
+        /// </summary>
+        /// <param name="blogCategorySeName">Blog category sename</param>
+        /// <returns></returns>
+        Task<BlogCategory> GetBlogCategoryBySeName(string blogCategorySeName);
 
         /// <summary>
         /// Get all blog categories

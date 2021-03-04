@@ -1,8 +1,8 @@
 ﻿using FluentValidation;
 using Grand.Core;
-using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Customers;
-using Grand.Framework.Validators;
+using Grand.Domain.Catalog;
+using Grand.Domain.Customers;
+using Grand.Core.Validators;
 using Grand.Services.Catalog;
 using Grand.Services.Localization;
 using Grand.Web.Areas.Admin.Extensions;

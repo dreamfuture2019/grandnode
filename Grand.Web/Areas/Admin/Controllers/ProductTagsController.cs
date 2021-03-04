@@ -1,4 +1,4 @@
-﻿using Grand.Core.Domain.Seo;
+﻿using Grand.Domain.Seo;
 using Grand.Framework.Extensions;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
@@ -26,16 +26,17 @@ namespace Grand.Web.Areas.Admin.Controllers
         private readonly SeoSettings _seoSettings;
         public ProductTagsController(IProductTagService productTagService, IProductService productService, ILanguageService languageService, SeoSettings seoSettings)
         {
-            this._productTagService = productTagService;
-            this._productService = productService;
-            this._languageService = languageService;
-            this._seoSettings = seoSettings;
+            _productTagService = productTagService;
+            _productService = productService;
+            _languageService = languageService;
+            _seoSettings = seoSettings;
         }
 
         public IActionResult Index() => RedirectToAction("List");
 
         public IActionResult List() => View();
 
+        [PermissionAuthorizeAction(PermissionActionName.List)]
         [HttpPost]
         public async Task<IActionResult> List(DataSourceRequest command)
         {
@@ -58,12 +59,14 @@ namespace Grand.Web.Areas.Admin.Controllers
 
             return Json(gridModel);
         }
+
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         [HttpPost]
         public async Task<IActionResult> Products(string tagId, DataSourceRequest command)
         {
             var tag = await _productTagService.GetProductTagById(tagId);
 
-            var products = (await _productService.SearchProducts(pageIndex: command.Page - 1, pageSize: command.PageSize, productTag: tag.Name, orderBy: Core.Domain.Catalog.ProductSortingEnum.NameAsc)).products;
+            var products = (await _productService.SearchProducts(pageIndex: command.Page - 1, pageSize: command.PageSize, productTag: tag.Name, orderBy: Domain.Catalog.ProductSortingEnum.NameAsc)).products;
             var gridModel = new DataSourceResult
             {
                 Data = products.Select(x => new
@@ -78,6 +81,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         //edit
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         public async Task<IActionResult> Edit(string id)
         {
             var productTag = await _productTagService.GetProductTagById(id);
@@ -100,6 +104,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return View(model);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost]
         public async Task<IActionResult> Edit(ProductTagModel model)
         {
@@ -121,6 +126,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return View(model);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Delete)]
         [HttpPost]
         public async Task<IActionResult> Delete(string id)
         {

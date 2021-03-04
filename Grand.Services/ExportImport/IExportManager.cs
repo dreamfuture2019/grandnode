@@ -1,8 +1,8 @@
-﻿using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Directory;
-using Grand.Core.Domain.Messages;
-using Grand.Core.Domain.Orders;
+﻿using Grand.Domain.Catalog;
+using Grand.Domain.Customers;
+using Grand.Domain.Directory;
+using Grand.Domain.Messages;
+using Grand.Domain.Orders;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -72,7 +72,7 @@ namespace Grand.Services.ExportImport
         /// Export customer - personal info to XLSX
         /// </summary>
         /// <param name="customer">Customer</param>
-        Task<byte[]> ExportCustomerToXlsx(Customer customer, string stroreId);
+        Task<byte[]> ExportCustomerToXlsx(Customer customer, string storeId);
 
         /// <summary>
         /// Export customer list to xml

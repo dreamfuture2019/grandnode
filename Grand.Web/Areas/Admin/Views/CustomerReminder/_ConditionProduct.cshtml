@@ -68,7 +68,7 @@
                             field: "ProductName",
                             title: "@T("Admin.Customers.CustomerReminder.Condition.Fields.ProductName")",
                             width: 300,
-                            template: '<a class="k-link" href="@Url.Content("~/Admin/Product/Edit/")#=Id#">#=kendo.htmlEncode(ProductName)#</a>',
+                            template: '<a class="k-link" href="@Url.Action("Edit", "Product")/#=Id#">#=kendo.htmlEncode(ProductName)#</a>',
 
                     },
                     {
@@ -80,7 +80,7 @@
             });
     </script>
 
-    <script type="text/javascript">
+    <script>
         $(document).ready(function () {
             $('#btnRefreshProducts').click(function () {
                 var grid = $("#products-grid").data('kendoGrid');

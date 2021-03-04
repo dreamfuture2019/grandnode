@@ -3,7 +3,7 @@
 <input asp-for="Id" type="hidden" />
 <input asp-for="CustomerId" type="hidden" />
 
-<input id="active-menu-item" type="hidden" value="/Admin/Document/List" />
+<input id="active-menu-item" type="hidden" value="/@Constants.AreaAdmin/Document/List" />
 
 <admin-tabstrip name="document-edit">
     <items>
@@ -35,11 +35,22 @@
                 </div>
             </content>
         </tabstrip-item>
+        <tabstrip-item text="@T("Admin.Common.GenericAttributes.Tab")" tab-index="4">
+            <content>
+                <div>
+                    @{
+                        ViewData["ObjectType"] = "Document";
+                        ViewData["TabIndex"] = 4;
+                    }
+                    <partial name="_GenericAttributes" model="Model" view-data="ViewData" />
+                </div>
+            </content>
+        </tabstrip-item>
         <vc:admin-widget widget-zone="document_details_tabs" additional-data="Model" />
     </items>
 </admin-tabstrip>
 
-<script type="text/javascript">
+<script>
     $(document).ready(function () {
         $("#@Html.FieldIdFor(model => model.ReferenceId)").change(toggleReferenceType);
         toggleReferenceType();

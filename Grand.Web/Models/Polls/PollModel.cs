@@ -1,10 +1,10 @@
-﻿using Grand.Framework.Mvc.Models;
+﻿using Grand.Core.Models;
 using System;
 using System.Collections.Generic;
 
 namespace Grand.Web.Models.Polls
 {
-    public partial class PollModel : BaseGrandEntityModel, ICloneable
+    public partial class PollModel : BaseEntityModel
     {
         public PollModel()
         {
@@ -19,14 +19,9 @@ namespace Grand.Web.Models.Polls
         
         public IList<PollAnswerModel> Answers { get; set; }
 
-        public object Clone()
-        {
-            //we use a shallow copy (deep clone is not required here)
-            return MemberwiseClone();
-        }
     }
 
-    public partial class PollAnswerModel : BaseGrandEntityModel
+    public partial class PollAnswerModel : BaseEntityModel
     {
         public string Name { get; set; }
         public string PollId { get; set; }

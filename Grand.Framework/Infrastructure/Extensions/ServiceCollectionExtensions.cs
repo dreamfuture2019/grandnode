@@ -2,24 +2,22 @@
 using Grand.Core;
 using Grand.Core.Configuration;
 using Grand.Core.Data;
-using Grand.Core.Domain;
-using Grand.Core.Infrastructure;
+using Grand.Core.ModelBinding;
 using Grand.Core.Plugins;
-using Grand.Framework.Mvc.ModelBinding;
+using Grand.Core.TypeFinders;
+using Grand.Domain.Configuration;
+using Grand.Framework.Extensions;
 using Grand.Framework.Mvc.Routing;
-using Grand.Framework.Security.Authorization;
 using Grand.Framework.Themes;
 using Grand.Services.Authentication;
 using Grand.Services.Authentication.External;
 using Grand.Services.Configuration;
 using Grand.Services.Security;
 using MediatR;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.Extensions.Configuration;
@@ -36,6 +34,7 @@ using System.Text.Encodings.Web;
 using System.Text.Unicode;
 using WebMarkupMin.AspNet.Common.UrlMatchers;
 using WebMarkupMin.AspNetCore3;
+using Wkhtmltopdf.NetCore;
 
 namespace Grand.Framework.Infrastructure.Extensions
 {
@@ -61,11 +60,12 @@ namespace Grand.Framework.Infrastructure.Extensions
 
             //add accessor to HttpContext
             services.AddHttpContextAccessor();
+            //add wkhtmltopdf
+            services.AddWkhtmltopdf();
 
-            //create, initialize and configure the engine
-            var engine = EngineContext.Create();
-            engine.Initialize(services, configuration);
-            engine.ConfigureServices(services, configuration);
+            //initialize and configure the engine
+            Engine.Initialize(services, configuration);
+            Engine.ConfigureServices(services, configuration);
 
         }
 
@@ -116,7 +116,7 @@ namespace Grand.Framework.Infrastructure.Extensions
             services.AddAntiforgery(options =>
             {
                 options.Cookie = new CookieBuilder() {
-                    Name = ".Grand.Antiforgery"
+                    Name = $"{config.CookiePrefix}Antiforgery"
                 };
                 if (DataSettingsHelper.DatabaseIsInstalled())
                 {
@@ -136,7 +136,7 @@ namespace Grand.Framework.Infrastructure.Extensions
             services.AddSession(options =>
             {
                 options.Cookie = new CookieBuilder() {
-                    Name = ".Grand.Session",
+                    Name = $"{config.CookiePrefix}Session",
                     HttpOnly = true,
                 };
                 if (DataSettingsHelper.DatabaseIsInstalled())
@@ -201,7 +201,7 @@ namespace Grand.Framework.Infrastructure.Extensions
             //add main cookie authentication
             authenticationBuilder.AddCookie(GrandCookieAuthenticationDefaults.AuthenticationScheme, options =>
             {
-                options.Cookie.Name = GrandCookieAuthenticationDefaults.CookiePrefix + GrandCookieAuthenticationDefaults.AuthenticationScheme;
+                options.Cookie.Name = config.CookiePrefix + GrandCookieAuthenticationDefaults.AuthenticationScheme;
                 options.Cookie.HttpOnly = true;
                 options.LoginPath = GrandCookieAuthenticationDefaults.LoginPath;
                 options.AccessDeniedPath = GrandCookieAuthenticationDefaults.AccessDeniedPath;
@@ -212,7 +212,7 @@ namespace Grand.Framework.Infrastructure.Extensions
             //add external authentication
             authenticationBuilder.AddCookie(GrandCookieAuthenticationDefaults.ExternalAuthenticationScheme, options =>
             {
-                options.Cookie.Name = GrandCookieAuthenticationDefaults.CookiePrefix + GrandCookieAuthenticationDefaults.ExternalAuthenticationScheme;
+                options.Cookie.Name = config.CookiePrefix + GrandCookieAuthenticationDefaults.ExternalAuthenticationScheme;
                 options.Cookie.HttpOnly = true;
                 options.LoginPath = GrandCookieAuthenticationDefaults.LoginPath;
                 options.AccessDeniedPath = GrandCookieAuthenticationDefaults.AccessDeniedPath;
@@ -220,7 +220,7 @@ namespace Grand.Framework.Infrastructure.Extensions
             });
 
             //register external authentication plugins now
-            var typeFinder = new WebAppTypeFinder();
+            var typeFinder = new AppTypeFinder();
             var externalAuthConfigurations = typeFinder.FindClassesOfType<IExternalAuthenticationRegistrar>();
             //create and sort instances of external authentication configurations
             var externalAuthInstances = externalAuthConfigurations
@@ -232,8 +232,6 @@ namespace Grand.Framework.Infrastructure.Extensions
             foreach (var instance in externalAuthInstances)
                 instance.Configure(authenticationBuilder, configuration);
 
-            services.AddSingleton<IAuthorizationPolicyProvider, PermisionPolicyProvider>();
-            services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
         }
 
         /// <summary>
@@ -248,6 +246,8 @@ namespace Grand.Framework.Infrastructure.Extensions
             {
                 //add custom display metadata provider
                 options.ModelMetadataDetailsProviders.Add(new GrandMetadataProvider());
+                //for API - ignore for PWA
+                options.Conventions.Add(new ApiExplorerIgnores());
             });
 
             mvcBuilder.AddRazorRuntimeCompilation();
@@ -285,12 +285,11 @@ namespace Grand.Framework.Infrastructure.Extensions
             mvcBuilder.AddNewtonsoftJson(options => options.SerializerSettings.ContractResolver = new DefaultContractResolver());
 
             //add fluent validation
+            var typeFinder = new AppTypeFinder();
+
             mvcBuilder.AddFluentValidation(configuration =>
             {
-                var assemblies = mvcBuilder.PartManager.ApplicationParts
-                    .OfType<AssemblyPart>()
-                    .Where(part => part.Name.StartsWith("Grand", StringComparison.InvariantCultureIgnoreCase))
-                    .Select(part => part.Assembly);
+                var assemblies = typeFinder.GetAssemblies();
                 configuration.RegisterValidatorsFromAssemblies(assemblies);
                 configuration.RunDefaultMvcValidationAfterFluentValidationExecutes = false;
                 //implicit/automatic validation of child properties
@@ -319,10 +318,10 @@ namespace Grand.Framework.Infrastructure.Extensions
                 options.IgnoredPaths.Add("/api");
                 options.IgnoredPaths.Add("/odata");
                 options.IgnoredPaths.Add("/health/live");
-                options.IgnoredPaths.Add("/.well-known/acme-challenge");
+                options.IgnoredPaths.Add("/.well-known/pki-validation");
                 //determine who can access the MiniProfiler results
                 options.ResultsAuthorize = request =>
-                    !request.HttpContext.RequestServices.GetRequiredService<StoreInformationSettings>().DisplayMiniProfilerInPublicStore ||
+                    !request.HttpContext.RequestServices.GetRequiredService<GrandConfig>().DisplayMiniProfilerInPublicStore ||
                     request.HttpContext.RequestServices.GetRequiredService<IPermissionService>().Authorize(StandardPermissionProvider.AccessAdminPanel).Result;
             });
         }
@@ -339,7 +338,7 @@ namespace Grand.Framework.Infrastructure.Extensions
 
         public static void AddSettings(this IServiceCollection services)
         {
-            var typeFinder = new WebAppTypeFinder();
+            var typeFinder = new AppTypeFinder();
             var settings = typeFinder.FindClassesOfType<ISettings>();
             var instances = settings.Select(x => (ISettings)Activator.CreateInstance(x));
             foreach (var item in instances)
@@ -380,18 +379,25 @@ namespace Grand.Framework.Infrastructure.Extensions
             .AddHtmlMinification(options =>
             {
                 options.ExcludedPages = new List<IUrlMatcher> {
+                    new WildcardUrlMatcher("/swagger/*"),
                     new WildcardUrlMatcher("/admin/*"),
-                    new ExactUrlMatcher("/admin")
+                    new ExactUrlMatcher("/admin"),
                 };
             })
             .AddXmlMinification(options =>
             {
                 options.ExcludedPages = new List<IUrlMatcher> {
+                    new WildcardUrlMatcher("/swagger/*"),
                     new WildcardUrlMatcher("/admin/*"),
-                    new ExactUrlMatcher("/admin")
+                    new ExactUrlMatcher("/admin"),
                 };
             })
-            .AddHttpCompression();
+            .AddHttpCompression(options =>
+            {
+                options.ExcludedPages = new List<IUrlMatcher> {
+                    new WildcardUrlMatcher("/swagger/*"),
+                };
+            });
 
         }
 
@@ -416,7 +422,7 @@ namespace Grand.Framework.Infrastructure.Extensions
         /// <param name="services">Collection of service descriptors</param>
         public static void AddMediator(this IServiceCollection services)
         {
-            var typeFinder = new WebAppTypeFinder();
+            var typeFinder = new AppTypeFinder();
             var assemblies = typeFinder.GetAssemblies();
             services.AddMediatR(assemblies.ToArray());
         }
@@ -427,7 +433,7 @@ namespace Grand.Framework.Infrastructure.Extensions
         /// <param name="services">Collection of service descriptors</param>
         public static void AddDetectionDevice(this IServiceCollection services)
         {
-            services.AddDetectionCore().AddDevice().AddCrawler();
+            services.AddDetection();
         }
 
 
@@ -445,7 +451,8 @@ namespace Grand.Framework.Infrastructure.Extensions
             if (config.EnableProgressiveWebApp)
             {
                 var options = new WebEssentials.AspNetCore.Pwa.PwaOptions {
-                    Strategy = (WebEssentials.AspNetCore.Pwa.ServiceWorkerStrategy)config.ServiceWorkerStrategy
+                    Strategy = (WebEssentials.AspNetCore.Pwa.ServiceWorkerStrategy)config.ServiceWorkerStrategy,
+                    RoutesToIgnore = "/admin/*"
                 };
                 services.AddProgressiveWebApp(options);
             }

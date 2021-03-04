@@ -1,5 +1,5 @@
 ﻿@model CustomerAttributeModel
-<script type="text/javascript">
+<script>
     $(document).ready(function () {
         $("#@Html.FieldIdFor(model => model.AttributeControlTypeId)").change(toggleAttributeControlType);
         toggleAttributeControlType();
@@ -7,7 +7,7 @@
     });
     function toggleAttributeControlType() {
         var selectedAttributeControlTypeId = $("#@Html.FieldIdFor(model => model.AttributeControlTypeId)").val();
-        if (selectedAttributeControlTypeId == @(((int) AttributeControlType.TextBox).ToString())) {
+        if (selectedAttributeControlTypeId == @(((int) AttributeControlType.TextBox).ToString()) || selectedAttributeControlTypeId == @(((int) AttributeControlType.Hidden).ToString())) {
             $('#tab-customerattributesvalues').hide();
         } else if (selectedAttributeControlTypeId == @(((int) AttributeControlType.MultilineTextbox).ToString())) {
             $('#tab-customerattributesvalues').hide();

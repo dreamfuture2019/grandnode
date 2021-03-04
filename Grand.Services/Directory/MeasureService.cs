@@ -1,11 +1,11 @@
 using Grand.Core;
 using Grand.Core.Caching;
-using Grand.Core.Data;
-using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Directory;
+using Grand.Core.Caching.Constants;
+using Grand.Domain.Data;
+using Grand.Domain.Directory;
+using Grand.Services.Commands.Models.Catalog;
 using Grand.Services.Events;
 using MediatR;
-using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using System;
@@ -20,71 +20,17 @@ namespace Grand.Services.Directory
     /// </summary>
     public partial class MeasureService : IMeasureService
     {
-        #region Constants
-
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        private const string MEASUREDIMENSIONS_ALL_KEY = "Grand.measuredimension.all";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : dimension ID
-        /// </remarks>
-        private const string MEASUREDIMENSIONS_BY_ID_KEY = "Grand.measuredimension.id-{0}";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        private const string MEASUREWEIGHTS_ALL_KEY = "Grand.measureweight.all";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : weight ID
-        /// </remarks>
-        private const string MEASUREWEIGHTS_BY_ID_KEY = "Grand.measureweight.id-{0}";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string MEASUREDIMENSIONS_PATTERN_KEY = "Grand.measuredimension.";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string MEASUREWEIGHTS_PATTERN_KEY = "Grand.measureweight.";
-
-
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        private const string MEASUREUNITS_ALL_KEY = "Grand.measureunit.all";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : dimension ID
-        /// </remarks>
-        private const string MEASUREUNITS_BY_ID_KEY = "Grand.measureunit.id-{0}";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string MEASUREUNITS_PATTERN_KEY = "Grand.measureunit.";
-
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string PRODUCTS_PATTERN_KEY = "Grand.product.";
-        #endregion
+        
 
         #region Fields
 
         private readonly IRepository<MeasureDimension> _measureDimensionRepository;
         private readonly IRepository<MeasureWeight> _measureWeightRepository;
         private readonly IRepository<MeasureUnit> _measureUnitRepository;
-        private readonly ICacheManager _cacheManager;
+        private readonly ICacheBase _cacheBase;
         private readonly MeasureSettings _measureSettings;
         private readonly IMediator _mediator;
-        private readonly IServiceProvider _serviceProvider;
+
         #endregion
 
         #region Ctor
@@ -98,21 +44,19 @@ namespace Grand.Services.Directory
         /// <param name="measureUnitRepository">Unit repository</param>
         /// <param name="measureSettings">Measure settings</param>
         /// <param name="mediator">Mediator</param>
-        public MeasureService(ICacheManager cacheManager,
+        public MeasureService(ICacheBase cacheManager,
             IRepository<MeasureDimension> measureDimensionRepository,
             IRepository<MeasureWeight> measureWeightRepository,
             IRepository<MeasureUnit> measureUnitRepository,
             MeasureSettings measureSettings,
-            IMediator mediator,
-            IServiceProvider serviceProvider)
+            IMediator mediator)
         {
-            _cacheManager = cacheManager;
+            _cacheBase = cacheManager;
             _measureDimensionRepository = measureDimensionRepository;
             _measureWeightRepository = measureWeightRepository;
             _measureUnitRepository = measureUnitRepository;
             _measureSettings = measureSettings;
             _mediator = mediator;
-            _serviceProvider = serviceProvider;
         }
 
         #endregion
@@ -132,12 +76,12 @@ namespace Grand.Services.Directory
 
             await _measureDimensionRepository.DeleteAsync(measureDimension);
 
-            await _cacheManager.RemoveByPrefix(MEASUREDIMENSIONS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.MEASUREDIMENSIONS_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityDeleted(measureDimension);
         }
-        
+
         /// <summary>
         /// Gets a measure dimension by identifier
         /// </summary>
@@ -145,8 +89,8 @@ namespace Grand.Services.Directory
         /// <returns>Measure dimension</returns>
         public virtual Task<MeasureDimension> GetMeasureDimensionById(string measureDimensionId)
         {
-            string key = string.Format(MEASUREDIMENSIONS_BY_ID_KEY, measureDimensionId);
-            return _cacheManager.GetAsync(key, () => _measureDimensionRepository.GetByIdAsync(measureDimensionId));
+            string key = string.Format(CacheKey.MEASUREDIMENSIONS_BY_ID_KEY, measureDimensionId);
+            return _cacheBase.GetAsync(key, () => _measureDimensionRepository.GetByIdAsync(measureDimensionId));
         }
 
         /// <summary>
@@ -172,8 +116,8 @@ namespace Grand.Services.Directory
         /// <returns>Measure dimensions</returns>
         public virtual async Task<IList<MeasureDimension>> GetAllMeasureDimensions()
         {
-            string key = MEASUREDIMENSIONS_ALL_KEY;
-            return await _cacheManager.GetAsync(key, () =>
+            string key = CacheKey.MEASUREDIMENSIONS_ALL_KEY;
+            return await _cacheBase.GetAsync(key, () =>
             {
                 var query = from md in _measureDimensionRepository.Table
                             orderby md.DisplayOrder
@@ -193,7 +137,7 @@ namespace Grand.Services.Directory
 
             await _measureDimensionRepository.InsertAsync(measure);
 
-            await _cacheManager.RemoveByPrefix(MEASUREDIMENSIONS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.MEASUREDIMENSIONS_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityInserted(measure);
@@ -210,7 +154,7 @@ namespace Grand.Services.Directory
 
             await _measureDimensionRepository.UpdateAsync(measure);
 
-            await _cacheManager.RemoveByPrefix(MEASUREDIMENSIONS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.MEASUREDIMENSIONS_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityUpdated(measure);
@@ -224,7 +168,7 @@ namespace Grand.Services.Directory
         /// <param name="targetMeasureDimension">Target dimension</param>
         /// <param name="round">A value indicating whether a result should be rounded</param>
         /// <returns>Converted value</returns>
-        public virtual async Task<decimal> ConvertDimension(decimal value, 
+        public virtual async Task<decimal> ConvertDimension(decimal value,
             MeasureDimension sourceMeasureDimension, MeasureDimension targetMeasureDimension, bool round = true)
         {
             if (sourceMeasureDimension == null)
@@ -307,7 +251,7 @@ namespace Grand.Services.Directory
 
             await _measureWeightRepository.DeleteAsync(measureWeight);
 
-            await _cacheManager.RemoveByPrefix(MEASUREWEIGHTS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.MEASUREWEIGHTS_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityDeleted(measureWeight);
@@ -320,8 +264,8 @@ namespace Grand.Services.Directory
         /// <returns>Measure weight</returns>
         public virtual Task<MeasureWeight> GetMeasureWeightById(string measureWeightId)
         {
-            string key = string.Format(MEASUREWEIGHTS_BY_ID_KEY, measureWeightId);
-            return _cacheManager.GetAsync(key, () => _measureWeightRepository.GetByIdAsync(measureWeightId));
+            string key = string.Format(CacheKey.MEASUREWEIGHTS_BY_ID_KEY, measureWeightId);
+            return _cacheBase.GetAsync(key, () => _measureWeightRepository.GetByIdAsync(measureWeightId));
         }
 
         /// <summary>
@@ -347,8 +291,8 @@ namespace Grand.Services.Directory
         /// <returns>Measure weights</returns>
         public virtual async Task<IList<MeasureWeight>> GetAllMeasureWeights()
         {
-            string key = MEASUREWEIGHTS_ALL_KEY;
-            return await _cacheManager.GetAsync(key, () =>
+            string key = CacheKey.MEASUREWEIGHTS_ALL_KEY;
+            return await _cacheBase.GetAsync(key, () =>
             {
                 var query = from mw in _measureWeightRepository.Table
                             orderby mw.DisplayOrder
@@ -368,7 +312,7 @@ namespace Grand.Services.Directory
 
             await _measureWeightRepository.InsertAsync(measure);
 
-            await _cacheManager.RemoveByPrefix(MEASUREWEIGHTS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.MEASUREWEIGHTS_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityInserted(measure);
@@ -384,8 +328,8 @@ namespace Grand.Services.Directory
                 throw new ArgumentNullException("measure");
 
             await _measureWeightRepository.UpdateAsync(measure);
-            
-            await _cacheManager.RemoveByPrefix(MEASUREWEIGHTS_PATTERN_KEY);
+
+            await _cacheBase.RemoveByPrefix(CacheKey.MEASUREWEIGHTS_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityUpdated(measure);
@@ -479,18 +423,15 @@ namespace Grand.Services.Directory
             if (measureUnit == null)
                 throw new ArgumentNullException("measureUnit");
 
-            var builder = Builders<Product>.Filter;
-            var filter = builder.Eq(x => x.UnitId, measureUnit.Id);
-            var update = Builders<Product>.Update
-                .Set(x => x.UnitId, "");
+            //remove unit from products
+            await _mediator.Send(new DeleteMeasureUnitOnProductCommand() { MeasureUnitId = measureUnit.Id });
 
-            await _serviceProvider.GetRequiredService<IRepository<Product>>()
-                .Collection.UpdateManyAsync(filter, update);
-
+            //delete
             await _measureUnitRepository.DeleteAsync(measureUnit);
 
-            await _cacheManager.RemoveByPrefix(MEASUREUNITS_PATTERN_KEY);
-            await _cacheManager.RemoveByPrefix(PRODUCTS_PATTERN_KEY);
+            //clear cache
+            await _cacheBase.RemoveByPrefix(CacheKey.MEASUREUNITS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.PRODUCTS_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityDeleted(measureUnit);
@@ -503,19 +444,19 @@ namespace Grand.Services.Directory
         /// <returns>Measure dimension</returns>
         public virtual Task<MeasureUnit> GetMeasureUnitById(string measureUnitId)
         {
-            string key = string.Format(MEASUREUNITS_BY_ID_KEY, measureUnitId);
-            return _cacheManager.GetAsync(key, () => _measureUnitRepository.GetByIdAsync(measureUnitId));
+            string key = string.Format(CacheKey.MEASUREUNITS_BY_ID_KEY, measureUnitId);
+            return _cacheBase.GetAsync(key, () => _measureUnitRepository.GetByIdAsync(measureUnitId));
         }
 
-        
+
         /// <summary>
         /// Gets all measure units
         /// </summary>
         /// <returns>Measure unit</returns>
         public virtual async Task<IList<MeasureUnit>> GetAllMeasureUnits()
         {
-            string key = MEASUREUNITS_ALL_KEY;
-            return await _cacheManager.GetAsync(key, () =>
+            string key = CacheKey.MEASUREUNITS_ALL_KEY;
+            return await _cacheBase.GetAsync(key, () =>
             {
                 var query = from md in _measureUnitRepository.Table
                             orderby md.DisplayOrder
@@ -535,7 +476,7 @@ namespace Grand.Services.Directory
 
             await _measureUnitRepository.InsertAsync(measure);
 
-            await _cacheManager.RemoveByPrefix(MEASUREUNITS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.MEASUREUNITS_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityInserted(measure);
@@ -552,7 +493,7 @@ namespace Grand.Services.Directory
 
             await _measureUnitRepository.UpdateAsync(measure);
 
-            await _cacheManager.RemoveByPrefix(MEASUREUNITS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.MEASUREUNITS_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityUpdated(measure);

@@ -1,8 +1,8 @@
-using Grand.Core;
-using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Orders;
-using Grand.Core.Domain.Shipping;
-using System;
+using Grand.Domain;
+using Grand.Domain.Catalog;
+using Grand.Domain.Customers;
+using Grand.Domain.Orders;
+using Grand.Domain.Shipping;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -28,25 +28,6 @@ namespace Grand.Services.Catalog
         Task<IList<Product>> GetAllProductsDisplayedOnHomePage();
 
         /// <summary>
-        /// Gets recommended products for customer roles
-        /// </summary>
-        /// <returns>Products</returns>
-        Task<IList<Product>> GetRecommendedProducts(string[] customerRoleIds);
-
-        /// <summary>
-        /// Gets recommended products for customer roles
-        /// </summary>
-        /// <returns>Products</returns>
-        Task<IList<Product>> GetSuggestedProducts(string[] customerTagIds);
-
-        /// <summary>
-        /// Gets personalized products for customer 
-        /// </summary>
-        /// <param name="customerId">Customer Id</param>
-        /// <returns>Products</returns>
-        Task<IList<Product>> GetPersonalizedProducts(string customerId);
-
-        /// <summary>
         /// Gets product
         /// </summary>
         /// <param name="productId">Product identifier</param>
@@ -65,8 +46,9 @@ namespace Grand.Services.Catalog
         /// Gets products by identifier
         /// </summary>
         /// <param name="productIds">Product identifiers</param>
+        /// <param name="showHidden">Show hidden</param>
         /// <returns>Products</returns>
-        Task<IList<Product>> GetProductsByIds(string[] productIds);
+        Task<IList<Product>> GetProductsByIds(string[] productIds, bool showHidden = false);
 
         /// <summary>
         /// Gets products by discount
@@ -86,20 +68,12 @@ namespace Grand.Services.Catalog
         /// </summary>
         /// <param name="product">Product</param>
         Task UpdateProduct(Product product);
-
-        /// <summary>
-        /// Updates stock the product
-        /// </summary>
-        /// <param name="product">Product</param>
-        /// <param name="mediator">Notification</param>
-        Task UpdateStockProduct(Product product, bool mediator = true);
-
+       
         /// <summary>
         /// Updates most view on the product
         /// </summary>
         /// <param name="productId">ProductId</param>
-        /// <param name="qty">Count</param>
-        Task UpdateMostView(string productId, int qty);
+        Task UpdateMostView(string productId);
 
         /// <summary>
         /// Updates best sellers on the product
@@ -111,16 +85,17 @@ namespace Grand.Services.Catalog
         /// <summary>
         /// Set product as unpublished
         /// </summary>
-        /// <param name="productId"></param>
-        Task UnpublishProduct(string productId);
+        /// <param name="product"></param>
+        Task UnpublishProduct(Product product);
 
         /// <summary>
         /// Get (visible) product number in certain category
         /// </summary>
+        /// <param name="customer">Customer</param>
         /// <param name="categoryIds">Category identifiers</param>
         /// <param name="storeId">Store identifier; "" to load all records</param>
         /// <returns>Product number</returns>
-        int GetCategoryProductNumber(IList<string> categoryIds = null, string storeId = "");
+        int GetCategoryProductNumber(Customer customer, IList<string> categoryIds = null, string storeId = "");
 
         /// <summary>
         /// Search products
@@ -173,9 +148,9 @@ namespace Grand.Services.Catalog
             string keywords = null,
             bool searchDescriptions = false,
             bool searchSku = true,
-            bool searchProductTags = false, 
+            bool searchProductTags = false,
             string languageId = "",
-            IList<string> filteredSpecs = null, 
+            IList<string> filteredSpecs = null,
             ProductSortingEnum orderBy = ProductSortingEnum.Position,
             bool showHidden = false,
             bool? overridePublished = null);
@@ -202,37 +177,10 @@ namespace Grand.Services.Catalog
             string storeId = "", string vendorId = "", bool showHidden = false);
 
         /// <summary>
-        /// Update product review totals
-        /// </summary>
-        /// <param name="product">Product</param>
-        Task UpdateProductReviewTotals(Product product);
-
-        /// <summary>
         /// Update product associated 
         /// </summary>
         /// <param name="product">Product</param>
         Task UpdateAssociatedProduct(Product product);
-        /// <summary>
-        /// Update product review 
-        /// </summary>
-        /// <param name="product">Product</param>
-        Task UpdateProductReview(ProductReview productreview);
-
-        /// <summary>
-        /// Insert product review 
-        /// </summary>
-        /// <param name="product">Product</param>
-        Task InsertProductReview(ProductReview productreview);
-
-        /// <summary>
-        /// Get low stock products
-        /// </summary>
-        /// <param name="vendorId">Vendor identifier; "" to load all records</param>
-        /// <param name="products">Low stock products</param>
-        /// <param name="combinations">Low stock attribute combinations</param>
-        void GetLowStockProducts(string vendorId, string storeId,
-            out IList<Product> products,
-            out IList<ProductAttributeCombination> combinations);
 
         /// <summary>
         /// Gets a product by SKU
@@ -240,59 +188,6 @@ namespace Grand.Services.Catalog
         /// <param name="sku">SKU</param>
         /// <returns>Product</returns>
         Task<Product> GetProductBySku(string sku);
-
-        /// <summary>
-        /// Update Interval properties
-        /// </summary>
-        /// <param name="productId">Product Id</param>
-        /// <param name="Interval">Interval</param>
-        /// <param name="IntervalUnit">Interval unit</param>
-        /// <param name="includeBothDates">Include both dates</param>
-        Task UpdateIntervalProperties(string productId, int interval, IntervalUnit intervalUnit, bool  includeBothDates);
-
-
-        #endregion
-
-        #region Inventory management methods
-
-        /// <summary>
-        /// Adjust inventory
-        /// </summary>
-        /// <param name="product">Product</param>
-        /// <param name="quantityToChange">Quantity to increase or descrease</param>
-        /// <param name="attributesXml">Attributes in XML format</param>
-        Task AdjustInventory(Product product, int quantityToChange, string attributesXml = "", string warehouseId = "");
-
-        /// <summary>
-        /// Reserve the given quantity in the warehouses.
-        /// </summary>
-        /// <param name="product">Product</param>
-        /// <param name="quantity">Quantity, must be negative</param>
-        Task ReserveInventory(Product product, int quantity, string warehouseId);
-
-        /// <summary>
-        /// Unblocks the given quantity reserved items in the warehouses
-        /// </summary>
-        /// <param name="product">Product</param>
-        /// <param name="quantity">Quantity, must be positive</param>
-        Task UnblockReservedInventory(Product product, int quantity, string warehouseId);
-
-        /// <summary>
-        /// Book the reserved quantity
-        /// </summary>
-        /// <param name="product">Product</param>
-        /// <param name="attributeXML">AttributeXML</param>
-        /// <param name="warehouseId">Warehouse identifier</param>
-        /// <param name="quantity">Quantity, must be negative</param>
-        Task BookReservedInventory(Product product, string AttributeXML, string warehouseId, int quantity);
-
-        /// <summary>
-        /// Reverse booked inventory (if acceptable)
-        /// </summary>
-        /// <param name="product">product</param>
-        /// <param name="shipmentItem">Shipment item</param>
-        /// <returns>Quantity reversed</returns>
-        Task<int> ReverseBookedInventory(Product product, ShipmentItem shipmentItem);
 
         #endregion
 
@@ -408,22 +303,27 @@ namespace Grand.Services.Catalog
 
         #endregion
 
-        #region Product Tags
+        #region Product prices
 
         /// <summary>
-        /// Inserts a product tags
+        /// Deletes a product price
         /// </summary>
-        /// <param name="productTag">Product Tag</param>
-        Task InsertProductTag(ProductTag productTag);
+        /// <param name="productPrice">Product price</param>
+        Task DeleteProductPrice(ProductPrice productPrice);
 
         /// <summary>
-        /// Delete a product tags
+        /// Inserts a product price
         /// </summary>
-        /// <param name="productTag">Product Tag</param>
-        Task DeleteProductTag(ProductTag productTag);
+        /// <param name="productPrice">Product price</param>
+        Task InsertProductPrice(ProductPrice productPrice);
+
+        /// <summary>
+        /// Updates the product price
+        /// </summary>
+        /// <param name="productPrice">Product price</param>
+        Task UpdateProductPrice(ProductPrice productPrice);
 
         #endregion
-
 
         #region Product pictures
 
@@ -444,54 +344,6 @@ namespace Grand.Services.Catalog
         /// </summary>
         /// <param name="productPicture">Product picture</param>
         Task UpdateProductPicture(ProductPicture productPicture);
-
-        #endregion
-
-        #region Product reviews
-
-        /// <summary>
-        /// Gets all product reviews
-        /// </summary>
-        /// <param name="customerId">Customer identifier; "" to load all records</param>
-        /// <param name="approved">A value indicating whether to content is approved; null to load all records</param> 
-        /// <param name="fromUtc">Item creation from; null to load all records</param>
-        /// <param name="toUtc">Item item creation to; null to load all records</param>
-        /// <param name="message">Search title or review text; null to load all records</param>
-        /// <param name="storeId">Store identifier; "" to load all records</param>
-        /// <param name="productId">Product identifier; "" to load all records</param>
-        /// <returns>Reviews</returns>
-        Task<IPagedList<ProductReview>> GetAllProductReviews(string customerId, bool? approved = null,
-            DateTime? fromUtc = null, DateTime? toUtc = null,
-            string message = null, string storeId = "", string productId = "", int pageIndex = 0, int pageSize = int.MaxValue);
-
-        /// <summary>
-        /// Get rating sum for product
-        /// </summary>
-        /// <param name="productId">Product identifier</param>
-        /// <param name="storeId">Store identifier, "" to load all records</param> 
-        /// <returns>Sum</returns>
-        Task<int> RatingSumProduct(string productId, string storeId);
-
-        /// <summary>
-        /// Total reviews for product
-        /// </summary>
-        /// <param name="productId">Product identifier</param>
-        /// <param name="storeId">Store identifier, "" to load all records</param> 
-        /// <returns>Sum</returns>
-        Task<int> TotalReviewsProduct(string productId, string storeId);
-
-        /// <summary>
-        /// Gets product review
-        /// </summary>
-        /// <param name="productReviewId">Product review identifier</param>
-        /// <returns>Product review</returns>
-        Task<ProductReview> GetProductReviewById(string productReviewId);
-
-        /// <summary>
-        /// Deletes a product review
-        /// </summary>
-        /// <param name="productReview">Product review</param>
-        Task DeleteProductReview(ProductReview productReview);
 
         #endregion
 

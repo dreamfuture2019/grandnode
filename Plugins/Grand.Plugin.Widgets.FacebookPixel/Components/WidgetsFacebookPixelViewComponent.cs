@@ -1,39 +1,47 @@
 ﻿using Grand.Core;
-using Grand.Core.Domain.Orders;
-using Grand.Plugin.Widgets.FacebookPixel;
+using Grand.Plugin.Widgets.FacebookPixel.Models;
+using Grand.Services.Common;
 using Grand.Services.Orders;
-using Grand.Web.Models.ShoppingCart;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.DependencyInjection;
-using System;
+using Newtonsoft.Json;
 using System.Globalization;
-using System.Linq;
 using System.Threading.Tasks;
 
-namespace Grand.Plugin.Widgets.GoogleAnalytics.Components
+namespace Grand.Plugin.Widgets.FacebookPixel.Components
 {
     [ViewComponent(Name = "WidgetsFacebookPixel")]
     public class WidgetsFacebookPixelViewComponent : ViewComponent
     {
         private readonly IWorkContext _workContext;
+        private readonly IOrderService _orderService;
+        private readonly ICookiePreference _cookiePreference;
         private readonly IStoreContext _storeContext;
-        private readonly IServiceProvider _serviceProvider;
         private readonly FacebookPixelSettings _facebookPixelSettings;
 
-        public WidgetsFacebookPixelViewComponent(IWorkContext workContext,
+        public WidgetsFacebookPixelViewComponent(
+            IWorkContext workContext,
+            IOrderService orderService,
             IStoreContext storeContext,
-            IServiceProvider serviceProvider,
+            ICookiePreference cookiePreference,
             FacebookPixelSettings facebookPixelSettings
             )
         {
             _workContext = workContext;
+            _orderService = orderService;
+            _cookiePreference = cookiePreference;
             _storeContext = storeContext;
-            _serviceProvider = serviceProvider;
             _facebookPixelSettings = facebookPixelSettings;
         }
 
         public async Task<IViewComponentResult> InvokeAsync(string widgetZone, object additionalData = null)
         {
+
+            if (_facebookPixelSettings.AllowToDisableConsentCookie)
+            {
+                var enabled = await _cookiePreference.IsEnable(_workContext.CurrentCustomer, _storeContext.CurrentStore, FacebookPixelConst.ConsentCookieSystemName);
+                if ((enabled.HasValue && !enabled.Value) || (!enabled.HasValue && !_facebookPixelSettings.ConsentDefaultState))
+                    return Content("");
+            }
             //page
             if (widgetZone == FacebookPixelWidgetZone.Page)
             {
@@ -42,7 +50,7 @@ namespace Grand.Plugin.Widgets.GoogleAnalytics.Components
             //add to cart
             if (widgetZone == FacebookPixelWidgetZone.AddToCart)
             {
-                var model = additionalData as AddToCartModel;
+                var model = JsonConvert.DeserializeObject<FacebookAddToCartModelModel>(JsonConvert.SerializeObject(additionalData));
                 if (model != null)
                 {
                     return View("~/Plugins/Widgets.FacebookPixel/Views/PublicInfo.cshtml", GetAddToCartScript(model));
@@ -61,14 +69,6 @@ namespace Grand.Plugin.Widgets.GoogleAnalytics.Components
             return Content("");
         }
 
-        private async Task<Order> GetLastOrder()
-        {
-            var orderService = _serviceProvider.GetRequiredService<IOrderService>();
-            var order = (await orderService.SearchOrders(storeId: _storeContext.CurrentStore.Id,
-                customerId: _workContext.CurrentCustomer.Id, pageSize: 1)).FirstOrDefault();
-            return order;
-        }
-
         private string GetTrackingScript()
         {
             var trackingScript = _facebookPixelSettings.PixelScript + "\n";
@@ -76,7 +76,7 @@ namespace Grand.Plugin.Widgets.GoogleAnalytics.Components
             return trackingScript;
         }
 
-        private string GetAddToCartScript(AddToCartModel model)
+        private string GetAddToCartScript(FacebookAddToCartModelModel model)
         {
             var trackingScript = _facebookPixelSettings.AddToCartScript + "\n";
             trackingScript = trackingScript.Replace("{PRODUCTID}", model.ProductId);
@@ -90,8 +90,7 @@ namespace Grand.Plugin.Widgets.GoogleAnalytics.Components
         private async Task<string> GetOrderScript(string orderId)
         {
             var trackingScript = _facebookPixelSettings.DetailsOrderScript + "\n";
-            var orderService = _serviceProvider.GetRequiredService<IOrderService>();
-            var order = await orderService.GetOrderById(orderId);
+            var order = await _orderService.GetOrderById(orderId);
             if (order != null)
             {
                 trackingScript = trackingScript.Replace("{AMOUNT}", order.OrderTotal.ToString("F2", CultureInfo.InvariantCulture));

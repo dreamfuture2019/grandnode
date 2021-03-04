@@ -1,10 +1,9 @@
 ﻿using Grand.Core;
-using Grand.Core.Domain.Orders;
+using Grand.Domain.Orders;
 using Grand.Services.Catalog;
 using Grand.Services.Configuration;
 using Grand.Services.Discounts;
 using Grand.Services.Orders;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -15,15 +14,18 @@ namespace Grand.Plugin.DiscountRequirements.ShoppingCart
     {
         private readonly IWorkContext _workContext;
         private readonly IPriceCalculationService _priceCalculationService;
+        private readonly IProductService _productService;
         private readonly ISettingService _settingService;
         private readonly ShoppingCartSettings _shoppingCartSettings;
 
-        public ShoppingCartDiscountRequirementRule(IServiceProvider serviceProvider)
+        public ShoppingCartDiscountRequirementRule(IWorkContext workContext, IPriceCalculationService priceCalculationService,
+            IProductService productService, ISettingService settingService, ShoppingCartSettings shoppingCartSettings)
         {
-            _workContext = serviceProvider.GetRequiredService<IWorkContext>();
-            _priceCalculationService = serviceProvider.GetRequiredService<IPriceCalculationService>();
-            _settingService = serviceProvider.GetRequiredService<ISettingService>();
-            _shoppingCartSettings = serviceProvider.GetRequiredService<ShoppingCartSettings>();
+            _workContext = workContext;
+            _priceCalculationService = priceCalculationService;
+            _productService = productService;
+            _settingService = settingService;
+            _shoppingCartSettings = shoppingCartSettings;
         }
 
         /// <summary>
@@ -56,11 +58,13 @@ namespace Grand.Plugin.DiscountRequirements.ShoppingCart
                 return result;
             }
             decimal spentAmount = 0;
-            
+
             foreach (var ca in cart)
             {
                 bool calculateWithDiscount = false;
-                spentAmount += (await _priceCalculationService.GetSubTotal(ca, calculateWithDiscount)).subTotal;
+                var product = await _productService.GetProductById(ca.ProductId);
+                if (product != null)
+                    spentAmount += (await _priceCalculationService.GetSubTotal(ca, product, calculateWithDiscount)).subTotal;
             }
 
             result.IsValid = spentAmount > spentAmountRequirement;

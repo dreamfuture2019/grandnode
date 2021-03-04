@@ -1,5 +1,5 @@
-using Grand.Core.Data;
-using Grand.Core.Domain.Tasks;
+using Grand.Domain.Data;
+using Grand.Domain.Tasks;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using System;
@@ -47,7 +47,7 @@ namespace Grand.Services.Tasks
         public virtual Task<ScheduleTask> GetTaskByType(string type)
         {
             if (String.IsNullOrWhiteSpace(type))
-                return null;
+                return Task.FromResult<ScheduleTask>(null);
 
             var query = _taskRepository.Table;
 

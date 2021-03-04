@@ -3,6 +3,7 @@
 //------------------------------------------------------------------------------
 
 using Grand.Core.Infrastructure;
+using Grand.Core.TypeFinders;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -28,7 +29,7 @@ namespace Grand.Services.Shipping.Tracking
         /// <param name="typeFinder">Type finder</param>
         public GeneralShipmentTracker(ITypeFinder typeFinder)
         {
-            this._typeFinder = typeFinder;
+            _typeFinder = typeFinder;
         }
 
         #endregion

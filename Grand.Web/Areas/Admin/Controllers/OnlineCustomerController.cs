@@ -1,4 +1,5 @@
-﻿using Grand.Core.Domain.Customers;
+﻿using Grand.Core;
+using Grand.Domain.Customers;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Security.Authorization;
 using Grand.Services.Common;
@@ -11,7 +12,6 @@ using Grand.Web.Areas.Admin.Models.Customers;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
@@ -26,7 +26,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         private readonly IDateTimeHelper _dateTimeHelper;
         private readonly CustomerSettings _customerSettings;
         private readonly ILocalizationService _localizationService;
-
+        private readonly IWorkContext _workContext;
         #endregion
 
         #region Constructors
@@ -34,31 +34,33 @@ namespace Grand.Web.Areas.Admin.Controllers
         public OnlineCustomerController(ICustomerService customerService,
             IGeoLookupService geoLookupService, IDateTimeHelper dateTimeHelper,
             CustomerSettings customerSettings,
-            ILocalizationService localizationService)
+            ILocalizationService localizationService,
+            IWorkContext workContext)
         {
-            this._customerService = customerService;
-            this._geoLookupService = geoLookupService;
-            this._dateTimeHelper = dateTimeHelper;
-            this._customerSettings = customerSettings;
-            this._localizationService = localizationService;
+            _customerService = customerService;
+            _geoLookupService = geoLookupService;
+            _dateTimeHelper = dateTimeHelper;
+            _customerSettings = customerSettings;
+            _localizationService = localizationService;
+            _workContext = workContext;
         }
 
         #endregion
-        
+
         #region Methods
 
         public IActionResult List() => View();
 
         [HttpPost]
+        [PermissionAuthorizeAction(PermissionActionName.List)]
         public async Task<IActionResult> List(DataSourceRequest command)
         {
             var customers = await _customerService.GetOnlineCustomers(DateTime.UtcNow.AddMinutes(-_customerSettings.OnlineCustomerMinutes),
-                null, command.Page - 1, command.PageSize);
+                null, _workContext.CurrentCustomer.StaffStoreId, _workContext.CurrentCustomer.SeId, command.Page - 1, command.PageSize);
             var items = new List<OnlineCustomerModel>();
             foreach (var x in customers)
             {
-                var item = new OnlineCustomerModel()
-                {
+                var item = new OnlineCustomerModel() {
                     Id = x.Id,
                     CustomerInfo = !string.IsNullOrEmpty(x.Email) ? x.Email : _localizationService.GetResource("Admin.Customers.Guest"),
                     LastIpAddress = x.LastIpAddress,
@@ -71,8 +73,7 @@ namespace Grand.Web.Areas.Admin.Controllers
                 items.Add(item);
             }
 
-            var gridModel = new DataSourceResult
-            {
+            var gridModel = new DataSourceResult {
                 Data = items,
                 Total = customers.TotalCount
             };

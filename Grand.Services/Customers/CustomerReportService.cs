@@ -1,9 +1,9 @@
-using Grand.Core;
-using Grand.Core.Data;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Orders;
-using Grand.Core.Domain.Payments;
-using Grand.Core.Domain.Shipping;
+using Grand.Domain;
+using Grand.Domain.Data;
+using Grand.Domain.Customers;
+using Grand.Domain.Orders;
+using Grand.Domain.Payments;
+using Grand.Domain.Shipping;
 using Grand.Services.Helpers;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
@@ -100,7 +100,7 @@ namespace Grand.Services.Customers
                          select new
                          {
                              CustomerId = g.Key,
-                             OrderTotal = g.Sum(x => x.OrderTotal),
+                             OrderTotal = g.Sum(x => x.OrderTotal / x.CurrencyRate),
                              OrderCount = g.Count()
                          };
             switch (orderBy)

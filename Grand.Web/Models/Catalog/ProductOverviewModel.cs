@@ -1,6 +1,6 @@
-﻿using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Tax;
-using Grand.Framework.Mvc.Models;
+﻿using Grand.Domain.Catalog;
+using Grand.Domain.Tax;
+using Grand.Core.Models;
 using Grand.Services.Discounts;
 using Grand.Web.Models.Media;
 using System;
@@ -8,7 +8,7 @@ using System.Collections.Generic;
 
 namespace Grand.Web.Models.Catalog
 {
-    public partial class ProductOverviewModel : BaseGrandEntityModel
+    public partial class ProductOverviewModel : BaseEntityModel
     {
         public ProductOverviewModel()
         {
@@ -16,6 +16,7 @@ namespace Grand.Web.Models.Catalog
             DefaultPictureModel = new PictureModel();
             SecondPictureModel = new PictureModel();
             SpecificationAttributeModels = new List<ProductSpecificationModel>();
+            ProductAttributeModels = new List<ProductAttributeModel>();
             ReviewOverviewModel = new ProductReviewOverviewModel();
         }
         public string Name { get; set; }
@@ -31,6 +32,7 @@ namespace Grand.Web.Models.Catalog
         public bool IsFreeShipping { get; set; }
         public bool ShowSku { get; set; }
         public bool ShowQty { get; set; }
+        public bool LowStock { get; set; }
         public DateTime? EndTime { get; set; }
         public DateTime? EndTimeLocalTime { get; set; }
         public TaxDisplayType TaxDisplayType { get; set; }
@@ -44,11 +46,15 @@ namespace Grand.Web.Models.Catalog
 
         //specification attributes
         public IList<ProductSpecificationModel> SpecificationAttributeModels { get; set; }
+
+        //product attributes 
+        public IList<ProductAttributeModel> ProductAttributeModels { get; set; }
+        
         //price
         public ProductReviewOverviewModel ReviewOverviewModel { get; set; }
 
 		#region Nested Classes
-        public partial class ProductPriceModel : BaseGrandModel
+        public partial class ProductPriceModel : BaseModel
         {
             public ProductPriceModel()
             {
@@ -79,6 +85,34 @@ namespace Grand.Web.Models.Catalog
             public List<AppliedDiscount> AppliedDiscounts { get; set; }
             public TierPrice PreferredTierPrice { get; set; }
 
+        }
+        
+        public partial class ProductAttributeModel : BaseModel
+        {
+            public ProductAttributeModel()
+            {
+                Values = new List<ProductAttributeValueModel>();
+            }
+            public string Name { get; set; }
+            public string SeName { get; set; }
+            public string TextPrompt { get; set; }
+            public bool IsRequired { get; set; }
+            public AttributeControlType AttributeControlType { get; set; }
+            public IList<ProductAttributeValueModel> Values { get; set; }
+        }
+
+        public partial class ProductAttributeValueModel : BaseModel
+        {
+            public ProductAttributeValueModel()
+            {
+                ImageSquaresPictureModel = new PictureModel();
+                PictureModel = new PictureModel();
+            }
+            public string Name { get; set; }
+            public string ColorSquaresRgb { get; set; }
+            //picture model is used with "image square" attribute type
+            public PictureModel ImageSquaresPictureModel { get; set; }            
+            public PictureModel PictureModel { get; set; }
         }
         #endregion
     }

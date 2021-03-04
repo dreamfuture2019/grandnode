@@ -1,9 +1,7 @@
-﻿using Autofac;
-using Grand.Core;
+﻿using Grand.Core;
 using Grand.Core.Configuration;
 using Grand.Core.Data;
-using Grand.Core.Domain;
-using Grand.Core.Domain.Common;
+using Grand.Domain.Common;
 using Grand.Core.Infrastructure;
 using Grand.Framework.Middleware;
 using Grand.Framework.Mvc.Routing;
@@ -21,6 +19,8 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using WebMarkupMin.AspNetCore3;
+using Grand.Core.Routing;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace Grand.Framework.Infrastructure.Extensions
 {
@@ -33,9 +33,10 @@ namespace Grand.Framework.Infrastructure.Extensions
         /// Configure the application HTTP request pipeline
         /// </summary>
         /// <param name="application">Builder for configuring an application's request pipeline</param>
+        /// <param name="webHostEnvironment">Web Host Environment</param>
         public static void ConfigureRequestPipeline(this IApplicationBuilder application, IWebHostEnvironment webHostEnvironment)
         {
-            EngineContext.Current.ConfigureRequestPipeline(application);
+            Engine.ConfigureRequestPipeline(application, webHostEnvironment);
         }
 
         /// <summary>
@@ -43,9 +44,9 @@ namespace Grand.Framework.Infrastructure.Extensions
         /// </summary>
         /// <param name="container">ContainerBuilder from autofac</param>
         /// <param name="configuration">configuration</param>
-        public static void ConfigureContainer(this ContainerBuilder container, Microsoft.Extensions.Configuration.IConfiguration configuration)
+        public static void ConfigureContainer(this IServiceCollection container, Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
-            EngineContext.Current.ConfigureContainer(container, configuration);
+            Engine.ConfigureContainer(container, configuration);
         }
 
         /// <summary>
@@ -57,7 +58,7 @@ namespace Grand.Framework.Infrastructure.Extensions
             var serviceProvider = application.ApplicationServices;
             var grandConfig = serviceProvider.GetRequiredService<GrandConfig>();
             var hostingEnvironment = serviceProvider.GetRequiredService<IWebHostEnvironment>();
-            bool useDetailedExceptionPage = grandConfig.DisplayFullErrorStack || hostingEnvironment.IsDevelopment();
+            var useDetailedExceptionPage = grandConfig.DisplayFullErrorStack || hostingEnvironment.IsDevelopment();
             if (useDetailedExceptionPage)
             {
                 //get detailed exceptions for developing and testing purposes
@@ -117,8 +118,8 @@ namespace Grand.Framework.Infrastructure.Extensions
                 //handle 404 Not Found
                 if (context.HttpContext.Response.StatusCode == 404)
                 {
-                    string authHeader = context.HttpContext.Request.Headers["Authorization"];
-                    var apirequest = authHeader != null && authHeader.Split(' ')[0] == "Bearer";
+                    string authHeader = context.HttpContext.Request.Headers[HeaderNames.Authorization];
+                    var apirequest = authHeader != null && authHeader.Split(' ')[0] == JwtBearerDefaults.AuthenticationScheme;
 
                     var webHelper = context.HttpContext.RequestServices.GetRequiredService<IWebHelper>();
                     if (!apirequest && !webHelper.IsStaticResource())
@@ -182,6 +183,15 @@ namespace Grand.Framework.Infrastructure.Extensions
         }
 
         /// <summary>
+        /// Configure MVC endpoint
+        /// </summary>
+        /// <param name="application">Builder for configuring an application's request pipeline</param>
+        public static void UseGrandDetection(this IApplicationBuilder application)
+        {
+            application.UseDetection();
+        }
+
+        /// <summary>
         /// Configure static file serving
         /// </summary>
         /// <param name="application">Builder for configuring an application's request pipeline</param>
@@ -231,9 +241,9 @@ namespace Grand.Framework.Infrastructure.Extensions
             if (!DataSettingsHelper.DatabaseIsInstalled())
                 return;
 
-            var serviceProvider = application.ApplicationServices;
+            var grandConfig = application.ApplicationServices.GetRequiredService<GrandConfig>();
             //whether MiniProfiler should be displayed
-            if (serviceProvider.GetRequiredService<StoreInformationSettings>().DisplayMiniProfilerInPublicStore)
+            if (grandConfig.DisplayMiniProfilerInPublicStore)
             {
                 application.UseMiniProfiler();
             }

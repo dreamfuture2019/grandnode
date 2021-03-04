@@ -1,5 +1,5 @@
-﻿using Grand.Core.Domain.Catalog;
-using Grand.Framework.Mvc.Models;
+﻿using Grand.Domain.Catalog;
+using Grand.Api.Models;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace Grand.Api.DTOs.Catalog

@@ -1,6 +1,6 @@
 ﻿using Grand.Core;
-using Grand.Core.Domain.Orders;
-using Grand.Core.Domain.Shipping;
+using Grand.Domain.Orders;
+using Grand.Domain.Shipping;
 using Grand.Core.Plugins;
 using Grand.Plugin.Shipping.ByWeight.Services;
 using Grand.Services.Catalog;
@@ -21,30 +21,41 @@ namespace Grand.Plugin.Shipping.ByWeight
         #region Fields
 
         private readonly IShippingService _shippingService;
+        private readonly IShippingMethodService _shippingMethodService;
         private readonly IStoreContext _storeContext;
         private readonly IPriceCalculationService _priceCalculationService;
         private readonly ISettingService _settingService;
         private readonly IWebHelper _webHelper;
         private readonly IWorkContext _workContext;
         private readonly IServiceProvider _serviceProvider;
+        private readonly ILocalizationService _localizationService;
+        private readonly ILanguageService _languageService;
+        private readonly IProductService _productService;
         #endregion
 
         #region Ctor
         public ByWeightShippingComputationMethod(IShippingService shippingService,
+            IShippingMethodService shippingMethodService,
             IStoreContext storeContext,
             IPriceCalculationService priceCalculationService,
-            ShippingByWeightSettings shippingByWeightSettings,
             ISettingService settingService,
             IWebHelper webHelper,
             IWorkContext workContext,
+            ILocalizationService localizationService,
+            ILanguageService languageService,
+            IProductService productService,
             IServiceProvider serviceProvider)
         {
             _shippingService = shippingService;
+            _shippingMethodService = shippingMethodService;
             _storeContext = storeContext;
             _priceCalculationService = priceCalculationService;
             _settingService = settingService;
             _webHelper = webHelper;
             _workContext = workContext;
+            _localizationService = localizationService;
+            _languageService = languageService;
+            _productService = productService;
             _serviceProvider = serviceProvider;
         }
         #endregion
@@ -128,12 +139,14 @@ namespace Grand.Plugin.Shipping.ByWeight
             {
                 if (packageItem.ShoppingCartItem.IsFreeShipping)
                     continue;
-                //TODO we should use getShippingOptionRequest.Items.GetQuantity() method to get subtotal
-                subTotal += (await _priceCalculationService.GetSubTotal(packageItem.ShoppingCartItem)).subTotal;
+
+                var product = await _productService.GetProductById(packageItem.ShoppingCartItem.ProductId);
+                if (product != null)
+                    subTotal += (await _priceCalculationService.GetSubTotal(packageItem.ShoppingCartItem, product)).subTotal;
             }
             decimal weight = await _shippingService.GetTotalWeight(getShippingOptionRequest);
 
-            var shippingMethods = await _shippingService.GetAllShippingMethods(countryId, _workContext.CurrentCustomer);
+            var shippingMethods = await _shippingMethodService.GetAllShippingMethods(countryId, _workContext.CurrentCustomer);
             foreach (var shippingMethod in shippingMethods)
             {
                 decimal? rate = await GetRate(subTotal, weight, shippingMethod.Id,
@@ -168,43 +181,42 @@ namespace Grand.Plugin.Shipping.ByWeight
         public override async Task Install()
         {
             //settings
-            var settings = new ShippingByWeightSettings
-            {
+            var settings = new ShippingByWeightSettings {
                 LimitMethodsToCreated = false,
             };
             await _settingService.SaveSetting(settings);
 
             //locales
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.Store", "Store");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.Store.Hint", "If an asterisk is selected, then this shipping rate will apply to all stores.");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.Warehouse", "Warehouse");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.Warehouse.Hint", "If an asterisk is selected, then this shipping rate will apply to all warehouses.");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.Country", "Country");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.Country.Hint", "If an asterisk is selected, then this shipping rate will apply to all customers, regardless of the country.");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.StateProvince", "State / province");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.StateProvince.Hint", "If an asterisk is selected, then this shipping rate will apply to all customers from the given country, regardless of the state.");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.Zip", "Zip");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.Zip.Hint", "Zip / postal code. If zip is empty, then this shipping rate will apply to all customers from the given country or state, regardless of the zip code.");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.ShippingMethod", "Shipping method");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.ShippingMethod.Hint", "The shipping method.");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.From", "Order weight from");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.From.Hint", "Order weight from.");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.To", "Order weight to");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.To.Hint", "Order weight to.");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.AdditionalFixedCost", "Additional fixed cost");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.AdditionalFixedCost.Hint", "Specify an additional fixed cost per shopping cart for this option. Set to 0 if you don't want an additional fixed cost to be applied.");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.LowerWeightLimit", "Lower weight limit");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.LowerWeightLimit.Hint", "Lower weight limit. This field can be used for \"per extra weight unit\" scenarios.");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.PercentageRateOfSubtotal", "Charge percentage (of subtotal)");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.PercentageRateOfSubtotal.Hint", "Charge percentage (of subtotal).");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.RatePerWeightUnit", "Rate per weight unit");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.RatePerWeightUnit.Hint", "Rate per weight unit.");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.LimitMethodsToCreated", "Limit shipping methods to configured ones");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.LimitMethodsToCreated.Hint", "If you check this option, then your customers will be limited to shipping options configured here. Otherwise, they'll be able to choose any existing shipping options even they've not configured here (zero shipping fee in this case).");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Fields.DataHtml", "Data");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.AddRecord", "Add record");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Formula", "Formula to calculate rates");
-            await this.AddOrUpdatePluginLocaleResource(_serviceProvider, "Plugins.Shipping.ByWeight.Formula.Value", "[additional fixed cost] + ([order total weight] - [lower weight limit]) * [rate per weight unit] + [order subtotal] * [charge percentage]");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.Store", "Store");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.Store.Hint", "If an asterisk is selected, then this shipping rate will apply to all stores.");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.Warehouse", "Warehouse");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.Warehouse.Hint", "If an asterisk is selected, then this shipping rate will apply to all warehouses.");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.Country", "Country");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.Country.Hint", "If an asterisk is selected, then this shipping rate will apply to all customers, regardless of the country.");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.StateProvince", "State / province");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.StateProvince.Hint", "If an asterisk is selected, then this shipping rate will apply to all customers from the given country, regardless of the state.");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.Zip", "Zip");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.Zip.Hint", "Zip / postal code. If zip is empty, then this shipping rate will apply to all customers from the given country or state, regardless of the zip code.");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.ShippingMethod", "Shipping method");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.ShippingMethod.Hint", "The shipping method.");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.From", "Order weight from");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.From.Hint", "Order weight from.");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.To", "Order weight to");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.To.Hint", "Order weight to.");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.AdditionalFixedCost", "Additional fixed cost");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.AdditionalFixedCost.Hint", "Specify an additional fixed cost per shopping cart for this option. Set to 0 if you don't want an additional fixed cost to be applied.");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.LowerWeightLimit", "Lower weight limit");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.LowerWeightLimit.Hint", "Lower weight limit. This field can be used for \"per extra weight unit\" scenarios.");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.PercentageRateOfSubtotal", "Charge percentage (of subtotal)");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.PercentageRateOfSubtotal.Hint", "Charge percentage (of subtotal).");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.RatePerWeightUnit", "Rate per weight unit");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.RatePerWeightUnit.Hint", "Rate per weight unit.");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.LimitMethodsToCreated", "Limit shipping methods to configured ones");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.LimitMethodsToCreated.Hint", "If you check this option, then your customers will be limited to shipping options configured here. Otherwise, they'll be able to choose any existing shipping options even they've not configured here (zero shipping fee in this case).");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Fields.DataHtml", "Data");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.AddRecord", "Add record");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Formula", "Formula to calculate rates");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.ByWeight.Formula.Value", "[additional fixed cost] + ([order total weight] - [lower weight limit]) * [rate per weight unit] + [order subtotal] * [charge percentage]");
 
             await base.Install();
         }
@@ -237,10 +249,8 @@ namespace Grand.Plugin.Shipping.ByWeight
         /// <summary>
         /// Gets a shipping rate computation method type
         /// </summary>
-        public ShippingRateComputationMethodType ShippingRateComputationMethodType
-        {
-            get
-            {
+        public ShippingRateComputationMethodType ShippingRateComputationMethodType {
+            get {
                 return ShippingRateComputationMethodType.Offline;
             }
         }
@@ -249,10 +259,8 @@ namespace Grand.Plugin.Shipping.ByWeight
         /// <summary>
         /// Gets a shipment tracker
         /// </summary>
-        public IShipmentTracker ShipmentTracker
-        {
-            get
-            {
+        public IShipmentTracker ShipmentTracker {
+            get {
                 //uncomment a line below to return a general shipment tracker (finds an appropriate tracker by tracking number)
                 return null;
             }

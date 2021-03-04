@@ -1,6 +1,7 @@
-using Grand.Core;
-using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Shipping;
+using Grand.Domain;
+using Grand.Domain.Catalog;
+using Grand.Domain.Common;
+using Grand.Domain.Shipping;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -75,11 +76,44 @@ namespace Grand.Services.Shipping
         /// Get quantity in shipments. For example, get planned quantity to be shipped
         /// </summary>
         /// <param name="product">Product</param>
+        /// <param name="customAttribute">Custom Attribute</param>
         /// <param name="warehouseId">Warehouse identifier</param>
         /// <param name="ignoreShipped">Ignore already shipped shipments</param>
         /// <param name="ignoreDelivered">Ignore already delivered shipments</param>
         /// <returns>Quantity</returns>
-        Task<int> GetQuantityInShipments(Product product, string attributexml, string warehouseId,
+        Task<int> GetQuantityInShipments(Product product, IList<CustomAttribute> customAttribute, string warehouseId,
             bool ignoreShipped, bool ignoreDelivered);
+
+        #region Shipment notes
+
+        /// <summary>
+        /// Deletes an shipment note
+        /// </summary>
+        /// <param name="shipmentNote">The shipment note</param>
+        Task DeleteShipmentNote(ShipmentNote shipmentNote);
+
+        /// <summary>
+        /// Insert an shipment note
+        /// </summary>
+        /// <param name="shipmentNote">The shipment note</param>
+        Task InsertShipmentNote(ShipmentNote shipmentNote);
+
+
+        /// <summary>
+        /// Get shipmentnotes for shipment
+        /// </summary>
+        /// <param name="shipmentId">Shipment identifier</param>
+        /// <returns>ShipmentNote</returns>
+        Task<IList<ShipmentNote>> GetShipmentNotes(string shipmentId);
+
+        /// <summary>
+        /// Get shipmentnote by id
+        /// </summary>
+        /// <param name="shipmentnoteId">Shipment note identifier</param>
+        /// <returns>ShipmentNote</returns>
+        Task<ShipmentNote> GetShipmentNote(string shipmentnoteId);
+
+        #endregion
+
     }
 }

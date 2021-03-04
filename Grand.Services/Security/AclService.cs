@@ -1,14 +1,16 @@
 using Grand.Core;
+using Grand.Domain;
 using Grand.Core.Caching;
-using Grand.Core.Data;
-using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Security;
+using Grand.Domain.Data;
+using Grand.Domain.Catalog;
+using Grand.Domain.Customers;
+using Grand.Domain.Security;
 using Grand.Services.Events;
 using MediatR;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Grand.Core.Caching.Constants;
 
 namespace Grand.Services.Security
 {
@@ -17,20 +19,11 @@ namespace Grand.Services.Security
     /// </summary>
     public partial class AclService : IAclService
     {
-        #region Constants
-        
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string ACLRECORD_PATTERN_KEY = "Grand.aclrecord.";
-
-        #endregion
-
         #region Fields
 
         private readonly IRepository<AclRecord> _aclRecordRepository;
         private readonly IWorkContext _workContext;
-        private readonly ICacheManager _cacheManager;
+        private readonly ICacheBase _cacheBase;
         private readonly IMediator _mediator;
         private readonly CatalogSettings _catalogSettings;
 
@@ -46,13 +39,13 @@ namespace Grand.Services.Security
         /// <param name="aclRecordRepository">ACL record repository</param>
         /// <param name="catalogSettings">Catalog settings</param>
         /// <param name="mediator">Mediator</param>
-        public AclService(ICacheManager cacheManager, 
+        public AclService(ICacheBase cacheManager, 
             IWorkContext workContext,
             IRepository<AclRecord> aclRecordRepository,
             IMediator mediator,
             CatalogSettings catalogSettings)
         {
-            _cacheManager = cacheManager;
+            _cacheBase = cacheManager;
             _workContext = workContext;
             _aclRecordRepository = aclRecordRepository;
             _mediator = mediator;
@@ -75,7 +68,7 @@ namespace Grand.Services.Security
             await _aclRecordRepository.DeleteAsync(aclRecord);
 
             //cache
-            await _cacheManager.RemoveByPrefix(ACLRECORD_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.ACLRECORD_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityDeleted(aclRecord);
@@ -104,7 +97,7 @@ namespace Grand.Services.Security
             await _aclRecordRepository.InsertAsync(aclRecord);
 
             //cache
-            await _cacheManager.RemoveByPrefix(ACLRECORD_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.ACLRECORD_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityInserted(aclRecord);
@@ -122,7 +115,7 @@ namespace Grand.Services.Security
             await _aclRecordRepository.UpdateAsync(aclRecord);
 
             //cache
-            await _cacheManager.RemoveByPrefix(ACLRECORD_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.ACLRECORD_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityUpdated(aclRecord);

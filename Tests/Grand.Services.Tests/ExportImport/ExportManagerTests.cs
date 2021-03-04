@@ -1,10 +1,10 @@
-﻿using Grand.Core.Domain.Common;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Directory;
-using Grand.Core.Domain.Orders;
-using Grand.Core.Domain.Payments;
-using Grand.Core.Domain.Shipping;
-using Grand.Core.Domain.Tax;
+﻿using Grand.Domain.Common;
+using Grand.Domain.Customers;
+using Grand.Domain.Directory;
+using Grand.Domain.Orders;
+using Grand.Domain.Payments;
+using Grand.Domain.Shipping;
+using Grand.Domain.Tax;
 using Grand.Services.Catalog;
 using Grand.Services.Discounts;
 using Grand.Services.Media;
@@ -70,13 +70,12 @@ namespace Grand.Services.ExportImport.Tests
                 OrderShippingExclTax = 7.1M,
                 PaymentMethodAdditionalFeeInclTax = 8.1M,
                 PaymentMethodAdditionalFeeExclTax = 9.1M,
-                TaxRates = "1,3,5,7",
                 OrderTax = 10.1M,
                 OrderDiscount = 11.1M,
                 OrderTotal = 12.1M,
                 RefundedAmount  = 13.1M,
                 CheckoutAttributeDescription = "CheckoutAttributeDescription1",
-                CheckoutAttributesXml = "CheckoutAttributesXml1",
+                CheckoutAttributes = new List<CustomAttribute>(),
                 CustomerLanguageId = "14",
                 AffiliateId= "15",
                 CustomerIp="CustomerIp1",

@@ -1,5 +1,5 @@
-﻿using Grand.Core.Domain.Catalog;
-using Grand.Framework.Mvc.Models;
+﻿using Grand.Domain.Catalog;
+using Grand.Core.Models;
 using Grand.Web.Models.Common;
 using Grand.Web.Models.Media;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -7,7 +7,7 @@ using System.Collections.Generic;
 
 namespace Grand.Web.Models.ShoppingCart
 {
-    public partial class ShoppingCartModel : BaseGrandModel
+    public partial class ShoppingCartModel : BaseModel
     {
         public ShoppingCartModel()
         {
@@ -25,6 +25,7 @@ namespace Grand.Web.Models.ShoppingCart
         public bool ShowSku { get; set; }
         public bool ShowProductImages { get; set; }
         public bool IsEditable { get; set; }
+        public bool IsAllowOnHold { get; set; }
         public bool TermsOfServicePopup { get; set; }
         public IList<ShoppingCartItemModel> Items { get; set; }
 
@@ -46,7 +47,7 @@ namespace Grand.Web.Models.ShoppingCart
 
         #region Nested Classes
 
-        public partial class ShoppingCartItemModel : BaseGrandEntityModel
+        public partial class ShoppingCartItemModel : BaseEntityModel
         {
             public ShoppingCartItemModel()
             {
@@ -56,17 +57,22 @@ namespace Grand.Web.Models.ShoppingCart
                 Warnings = new List<string>();
             }
             public string Sku { get; set; }
+            public bool IsCart { get; set; }
             public PictureModel Picture {get;set;}
             public string ProductId { get; set; }
             public string ProductName { get; set; }
             public string ProductSeName { get; set; }
             public string WarehouseId { get; set; }
             public string WarehouseName { get; set; }
+            public string VendorId { get; set; }
+            public string VendorName { get; set; }
+            public string VendorSeName { get; set; }
             public string UnitPriceWithoutDiscount { get; set; }
             public decimal UnitPriceWithoutDiscountValue { get; set; }
             public string UnitPrice { get; set; }
             public decimal UnitPriceValue { get; set; }
             public string SubTotal { get; set; }
+            public decimal SubTotalValue { get; set; }
             public string Discount { get; set; }
             public int DiscountedQty { get; set; }
             public List<string> Discounts { get; set; }
@@ -82,7 +88,7 @@ namespace Grand.Web.Models.ShoppingCart
             public IList<string> Warnings { get; set; }
         }
 
-        public partial class CheckoutAttributeModel : BaseGrandEntityModel
+        public partial class CheckoutAttributeModel : BaseEntityModel
         {
             public CheckoutAttributeModel()
             {
@@ -121,7 +127,7 @@ namespace Grand.Web.Models.ShoppingCart
             public IList<CheckoutAttributeValueModel> Values { get; set; }
         }
 
-        public partial class CheckoutAttributeValueModel : BaseGrandEntityModel
+        public partial class CheckoutAttributeValueModel : BaseEntityModel
         {
             public string Name { get; set; }
 
@@ -132,7 +138,7 @@ namespace Grand.Web.Models.ShoppingCart
             public bool IsPreSelected { get; set; }
         }
 
-        public partial class DiscountBoxModel: BaseGrandModel
+        public partial class DiscountBoxModel: BaseModel
         {
             public DiscountBoxModel()
             {
@@ -142,20 +148,20 @@ namespace Grand.Web.Models.ShoppingCart
             public bool Display { get; set; }
             public string Message { get; set; }
             public bool IsApplied { get; set; }
-            public class DiscountInfoModel : BaseGrandEntityModel
+            public class DiscountInfoModel : BaseEntityModel
             {
                 public string CouponCode { get; set; }
             }
         }
 
-        public partial class GiftCardBoxModel : BaseGrandModel
+        public partial class GiftCardBoxModel : BaseModel
         {
             public bool Display { get; set; }
             public string Message { get; set; }
             public bool IsApplied { get; set; }
         }
 
-        public partial class OrderReviewDataModel : BaseGrandModel
+        public partial class OrderReviewDataModel : BaseModel
         {
             public OrderReviewDataModel()
             {

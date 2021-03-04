@@ -90,9 +90,9 @@ namespace Grand.Core
         T QueryString<T>(string name);
 
         /// <summary>
-        /// Restart application domain
+        /// Stop application
         /// </summary>
-        void RestartAppDomain();
+        void StopApplication();
         
         /// <summary>
         /// Gets a value that indicates whether the client is being redirected to a new location
@@ -118,10 +118,5 @@ namespace Grand.Core
         /// <returns>Raw URL</returns>
         string GetRawUrl(HttpRequest request);
 
-        /// <summary>
-        /// Get machine name
-        /// </summary>
-        /// <returns>Machine name</returns>
-        string GetMachineName();
     }
 }

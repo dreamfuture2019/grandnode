@@ -1,22 +1,27 @@
 ﻿using Grand.Core;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Orders;
-using Grand.Core.Domain.Shipping;
+using Grand.Domain.Customers;
+using Grand.Domain.Orders;
+using Grand.Domain.Shipping;
 using Grand.Framework.Controllers;
-using Grand.Framework.Security;
+using Grand.Services.Commands.Models.Orders;
 using Grand.Services.Common;
 using Grand.Services.Localization;
 using Grand.Services.Orders;
 using Grand.Services.Payments;
 using Grand.Services.Shipping;
-using Grand.Web.Interfaces;
-using Grand.Web.Models.Order;
+using Grand.Web.Commands.Models.Orders;
+using Grand.Web.Events;
+using Grand.Web.Features.Models.Orders;
+using Grand.Web.Models.Orders;
+using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
+using Grand.Web.Extensions;
 
 namespace Grand.Web.Controllers
 {
@@ -24,32 +29,32 @@ namespace Grand.Web.Controllers
     {
         #region Fields
 
-        private readonly IOrderViewModelService _orderViewModelService;
         private readonly IOrderService _orderService;
         private readonly IWorkContext _workContext;
-        private readonly IOrderProcessingService _orderProcessingService;
+        private readonly IStoreContext _storeContext;
         private readonly IPaymentService _paymentService;
         private readonly ILocalizationService _localizationService;
+        private readonly IMediator _mediator;
         private readonly OrderSettings _orderSettings;
 
         #endregion
 
         #region Constructors
 
-        public OrderController(IOrderViewModelService orderViewModelService,
-            IOrderService orderService,
+        public OrderController(IOrderService orderService,
             IWorkContext workContext,
-            IOrderProcessingService orderProcessingService,
+            IStoreContext storeContext,
             IPaymentService paymentService,
             ILocalizationService localizationService,
+            IMediator mediator,
             OrderSettings orderSettings)
         {
-            _orderViewModelService = orderViewModelService;
             _orderService = orderService;
             _workContext = workContext;
-            _orderProcessingService = orderProcessingService;
+            _storeContext = storeContext;
             _paymentService = paymentService;
             _localizationService = localizationService;
+            _mediator = mediator;
             _orderSettings = orderSettings;
         }
 
@@ -63,7 +68,11 @@ namespace Grand.Web.Controllers
             if (!_workContext.CurrentCustomer.IsRegistered())
                 return Challenge();
 
-            var model = await _orderViewModelService.PrepareCustomerOrderList();
+            var model = await _mediator.Send(new GetCustomerOrderList() {
+                Customer = _workContext.CurrentCustomer,
+                Language = _workContext.WorkingLanguage,
+                Store = _storeContext.CurrentStore
+            });
             return View(model);
         }
 
@@ -71,7 +80,8 @@ namespace Grand.Web.Controllers
         [HttpPost, ActionName("CustomerOrders")]
         [AutoValidateAntiforgeryToken]
         [FormValueRequired(FormValueRequirement.StartsWith, "cancelRecurringPayment")]
-        public virtual async Task<IActionResult> CancelRecurringPayment(IFormCollection form)
+        public virtual async Task<IActionResult> CancelRecurringPayment(IFormCollection form, 
+            [FromServices] IOrderRecurringPayment orderRecurringPayment)
         {
             if (!_workContext.CurrentCustomer.IsRegistered())
                 return Challenge();
@@ -88,11 +98,15 @@ namespace Grand.Web.Controllers
                 return RedirectToRoute("CustomerOrders");
             }
 
-            if (await _orderProcessingService.CanCancelRecurringPayment(_workContext.CurrentCustomer, recurringPayment))
+            if (await orderRecurringPayment.CanCancelRecurringPayment(_workContext.CurrentCustomer, recurringPayment))
             {
-                var errors = await _orderProcessingService.CancelRecurringPayment(recurringPayment);
+                var errors = await orderRecurringPayment.CancelRecurringPayment(recurringPayment);
 
-                var model = await _orderViewModelService.PrepareCustomerOrderList();
+                var model = await _mediator.Send(new GetCustomerOrderList() {
+                    Customer = _workContext.CurrentCustomer,
+                    Language = _workContext.WorkingLanguage,
+                    Store = _storeContext.CurrentStore
+                });
                 model.CancelRecurringPaymentErrors = errors;
 
                 return View(model);
@@ -112,8 +126,11 @@ namespace Grand.Web.Controllers
             if (!rewardPointsSettings.Enabled)
                 return RedirectToRoute("CustomerInfo");
 
-            var customer = _workContext.CurrentCustomer;
-            var model = await _orderViewModelService.PrepareCustomerRewardPoints(customer);
+            var model = await _mediator.Send(new GetCustomerRewardPoints() {
+                Customer = _workContext.CurrentCustomer,
+                Store = _storeContext.CurrentStore,
+                Currency = _workContext.WorkingCurrency
+            });
             return View(model);
         }
 
@@ -121,10 +138,10 @@ namespace Grand.Web.Controllers
         public virtual async Task<IActionResult> Details(string orderId)
         {
             var order = await _orderService.GetOrderById(orderId);
-            if (order == null || order.Deleted || _workContext.CurrentCustomer.Id != order.CustomerId)
+            if (!order.Access(_workContext.CurrentCustomer))
                 return Challenge();
 
-            var model = await _orderViewModelService.PrepareOrderDetails(order);
+            var model = await _mediator.Send(new GetOrderDetails() { Order = order, Language = _workContext.WorkingLanguage });
 
             return View(model);
         }
@@ -133,10 +150,10 @@ namespace Grand.Web.Controllers
         public virtual async Task<IActionResult> PrintOrderDetails(string orderId)
         {
             var order = await _orderService.GetOrderById(orderId);
-            if (order == null || order.Deleted || _workContext.CurrentCustomer.Id != order.CustomerId)
+            if (!order.Access(_workContext.CurrentCustomer))
                 return Challenge();
 
-            var model = await _orderViewModelService.PrepareOrderDetails(order);
+            var model = await _mediator.Send(new GetOrderDetails() { Order = order, Language = _workContext.WorkingLanguage });
             model.PrintMode = true;
 
             return View("Details", model);
@@ -146,15 +163,14 @@ namespace Grand.Web.Controllers
         public virtual async Task<IActionResult> CancelOrder(string orderId)
         {
             var order = await _orderService.GetOrderById(orderId);
-            if (order == null || order.PaymentStatus != Core.Domain.Payments.PaymentStatus.Pending
+            if (!order.Access(_workContext.CurrentCustomer) || order.PaymentStatus != Domain.Payments.PaymentStatus.Pending
                 || (order.ShippingStatus != ShippingStatus.ShippingNotRequired && order.ShippingStatus != ShippingStatus.NotYetShipped)
                 || order.OrderStatus != OrderStatus.Pending
-                || order.Deleted || _workContext.CurrentCustomer.Id != order.CustomerId
                 || !_orderSettings.UserCanCancelUnpaidOrder)
 
                 return Challenge();
 
-            await _orderProcessingService.CancelOrder(order, true, true);
+            await _mediator.Send(new CancelOrderCommand() { Order = order, NotifyCustomer = true, NotifyStoreOwner = true });
 
             return RedirectToRoute("OrderDetails", new { orderId = orderId });
         }
@@ -163,7 +179,7 @@ namespace Grand.Web.Controllers
         public virtual async Task<IActionResult> GetPdfInvoice(string orderId, [FromServices] IPdfService pdfService)
         {
             var order = await _orderService.GetOrderById(orderId);
-            if (order == null || order.Deleted || _workContext.CurrentCustomer.Id != order.CustomerId)
+            if (!order.Access(_workContext.CurrentCustomer))
                 return Challenge();
 
             var orders = new List<Order>();
@@ -184,7 +200,7 @@ namespace Grand.Web.Controllers
                 return RedirectToRoute("HomePage");
 
             var order = await _orderService.GetOrderById(orderId);
-            if (order == null || order.Deleted || _workContext.CurrentCustomer.Id != order.CustomerId)
+            if (!order.Access(_workContext.CurrentCustomer))
                 return Challenge();
 
             var model = new AddOrderNoteModel();
@@ -206,10 +222,13 @@ namespace Grand.Web.Controllers
             }
 
             var order = await _orderService.GetOrderById(model.OrderId);
-            if (order == null || order.Deleted || _workContext.CurrentCustomer.Id != order.CustomerId)
+            if (!order.Access(_workContext.CurrentCustomer))
                 return Challenge();
 
-            await _orderViewModelService.InsertOrderNote(model);
+            await _mediator.Send(new InsertOrderNoteCommand() { Order = order, OrderNote = model, Language = _workContext.WorkingLanguage });
+
+            //notification
+            await _mediator.Publish(new OrderNoteEvent(order, model));
 
             AddNotification(Framework.UI.NotifyType.Success, _localizationService.GetResource("OrderNote.Added"), true);
             return RedirectToRoute("OrderDetails", new { orderId = model.OrderId });
@@ -219,10 +238,13 @@ namespace Grand.Web.Controllers
         public virtual async Task<IActionResult> ReOrder(string orderId)
         {
             var order = await _orderService.GetOrderById(orderId);
-            if (order == null || order.Deleted || _workContext.CurrentCustomer.Id != order.CustomerId)
+            if (!order.Access(_workContext.CurrentCustomer))
                 return Challenge();
 
-            await _orderProcessingService.ReOrder(order);
+            var warnings = await _mediator.Send(new ReOrderCommand() { Order = order });
+            if(warnings.Any())
+                AddNotification(Framework.UI.NotifyType.Error, string.Join(",", warnings), true);
+
             return RedirectToRoute("ShoppingCart");
         }
 
@@ -233,14 +255,13 @@ namespace Grand.Web.Controllers
         public virtual async Task<IActionResult> RePostPayment(string orderId, [FromServices] IWebHelper webHelper)
         {
             var order = await _orderService.GetOrderById(orderId);
-            if (order == null || order.Deleted || _workContext.CurrentCustomer.Id != order.CustomerId)
+            if (!order.Access(_workContext.CurrentCustomer))
                 return Challenge();
 
             if (!await _paymentService.CanRePostProcessPayment(order))
                 return RedirectToRoute("OrderDetails", new { orderId = orderId });
 
-            var postProcessPaymentRequest = new PostProcessPaymentRequest
-            {
+            var postProcessPaymentRequest = new PostProcessPaymentRequest {
                 Order = order
             };
             await _paymentService.PostProcessPayment(postProcessPaymentRequest);
@@ -264,10 +285,15 @@ namespace Grand.Web.Controllers
                 return Challenge();
 
             var order = await _orderService.GetOrderById(shipment.OrderId);
-            if (order == null || order.Deleted || _workContext.CurrentCustomer.Id != order.CustomerId)
+            if (!order.Access(_workContext.CurrentCustomer))
                 return Challenge();
 
-            var model = await _orderViewModelService.PrepareShipmentDetails(shipment);
+            var model = await _mediator.Send(new GetShipmentDetails() {
+                Customer = _workContext.CurrentCustomer,
+                Language = _workContext.WorkingLanguage,
+                Order = order,
+                Shipment = shipment
+            });
 
             return View(model);
         }

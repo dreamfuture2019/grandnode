@@ -1,16 +1,17 @@
-﻿using Grand.Framework.Mvc.ModelBinding;
-using Grand.Framework.Mvc.Models;
+﻿using Grand.Core.ModelBinding;
+using Grand.Core.Models;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace Grand.Web.Areas.Admin.Models.Orders
 {
-    public partial class ShipmentModel : BaseGrandEntityModel
+    public partial class ShipmentModel : BaseEntityModel
     {
         public ShipmentModel()
         {
-            this.ShipmentStatusEvents = new List<ShipmentStatusEventModel>();
-            this.Items = new List<ShipmentItemModel>();
+            ShipmentStatusEvents = new List<ShipmentStatusEventModel>();
+            Items = new List<ShipmentItemModel>();
         }
         [GrandResourceDisplayName("Admin.Orders.Shipments.ID")]
         public override string Id { get; set; }
@@ -19,6 +20,7 @@ namespace Grand.Web.Areas.Admin.Models.Orders
         [GrandResourceDisplayName("Admin.Orders.Shipments.OrderID")]
         public string OrderId { get; set; }
         public int OrderNumber { get; set; }
+        public string OrderCode { get; set; }
         [GrandResourceDisplayName("Admin.Orders.Shipments.TotalWeight")]
         public string TotalWeight { get; set; }
         [GrandResourceDisplayName("Admin.Orders.Shipments.TrackingNumber")]
@@ -42,9 +44,21 @@ namespace Grand.Web.Areas.Admin.Models.Orders
 
         public IList<ShipmentStatusEventModel> ShipmentStatusEvents { get; set; }
 
+        //shipment notes
+        [GrandResourceDisplayName("Admin.Orders.Shipments.ShipmentNotes.Fields.DisplayToCustomer")]
+        public bool AddShipmentNoteDisplayToCustomer { get; set; }
+        [GrandResourceDisplayName("Admin.Orders.Shipments.ShipmentNotes.Fields.Note")]
+
+        public string AddShipmentNoteMessage { get; set; }
+        public bool AddShipmentNoteHasDownload { get; set; }
+        [GrandResourceDisplayName("Admin.Orders.Shipments.ShipmentNotes.Fields.Download")]
+        [UIHint("Download")]
+        public string AddShipmentNoteDownloadId { get; set; }
+
+
         #region Nested classes
 
-        public partial class ShipmentItemModel : BaseGrandEntityModel
+        public partial class ShipmentItemModel : BaseEntityModel
         {
             public ShipmentItemModel()
             {
@@ -79,7 +93,7 @@ namespace Grand.Web.Areas.Admin.Models.Orders
             public string WarehouseId { get; set; }
 
             #region Nested Classes
-            public class WarehouseInfo : BaseGrandModel
+            public class WarehouseInfo : BaseModel
             {
                 public string WarehouseId { get; set; }
                 public string WarehouseName { get; set; }
@@ -87,10 +101,28 @@ namespace Grand.Web.Areas.Admin.Models.Orders
                 public int ReservedQuantity { get; set; }
                 public int PlannedQuantity { get; set; }
             }
+
             #endregion
         }
 
-        public partial class ShipmentStatusEventModel : BaseGrandModel
+        public partial class ShipmentNote : BaseEntityModel
+        {
+            public string ShipmentId { get; set; }
+            [GrandResourceDisplayName("Admin.Orders.Shipments.ShipmentNotes.Fields.DisplayToCustomer")]
+            public bool DisplayToCustomer { get; set; }
+            [GrandResourceDisplayName("Admin.Orders.Shipments.ShipmentNotes.Fields.Note")]
+            public string Note { get; set; }
+            [GrandResourceDisplayName("Admin.Orders.Shipments.ShipmentNotes.Fields.Download")]
+            public string DownloadId { get; set; }
+            [GrandResourceDisplayName("Admin.Orders.Shipments.ShipmentNotes.Fields.Download")]
+            public Guid DownloadGuid { get; set; }
+            [GrandResourceDisplayName("Admin.Orders.Shipments.ShipmentNotes.Fields.CreatedOn")]
+            public DateTime CreatedOn { get; set; }
+            [GrandResourceDisplayName("Admin.Orders.Shipments.ShipmentNotes.Fields.CreatedByCustomer")]
+            public bool CreatedByCustomer { get; set; }
+        }
+
+        public partial class ShipmentStatusEventModel : BaseModel
         {
             public string EventName { get; set; }
             public string Location { get; set; }

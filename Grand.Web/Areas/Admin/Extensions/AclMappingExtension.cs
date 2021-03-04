@@ -1,18 +1,19 @@
-﻿using Grand.Core;
-using Grand.Core.Domain.Security;
-using Grand.Core.Domain.Stores;
+﻿using Grand.Domain;
+using Grand.Domain.Security;
+using Grand.Domain.Stores;
 using Grand.Framework.Mapping;
-using Grand.Framework.Mvc.Models;
+using Grand.Core.Models;
 using Grand.Services.Customers;
 using System.Linq;
 using System.Threading.Tasks;
+using Grand.Framework.Mvc.Models;
 
 namespace Grand.Web.Areas.Admin.Extensions
 {
     public static class AclMappingExtension
     {
         public static async Task PrepareACLModel<T>(this T baseGrandEntityModel, IAclSupported aclMapping, bool excludeProperties, ICustomerService customerService)
-            where T : BaseGrandEntityModel, IAclMappingModel
+            where T : BaseEntityModel, IAclMappingModel
         {
             baseGrandEntityModel.AvailableCustomerRoles = (await customerService
                .GetAllCustomerRoles(showHidden: true))

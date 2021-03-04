@@ -1,10 +1,10 @@
-﻿using Grand.Core.Domain.Catalog;
-using Grand.Framework.Mvc.Models;
+﻿using Grand.Domain.Catalog;
+using Grand.Core.Models;
 using System.Collections.Generic;
 
 namespace Grand.Web.Models.Customer
 {
-    public partial class CustomerAttributeModel : BaseGrandEntityModel
+    public partial class CustomerAttributeModel : BaseEntityModel
     {
         public CustomerAttributeModel()
         {
@@ -26,7 +26,7 @@ namespace Grand.Web.Models.Customer
 
     }
 
-    public partial class CustomerAttributeValueModel : BaseGrandEntityModel
+    public partial class CustomerAttributeValueModel : BaseEntityModel
     {
         public string Name { get; set; }
 

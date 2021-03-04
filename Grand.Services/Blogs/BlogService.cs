@@ -1,7 +1,7 @@
-using Grand.Core;
-using Grand.Core.Data;
-using Grand.Core.Domain.Blogs;
-using Grand.Core.Domain.Catalog;
+using Grand.Domain;
+using Grand.Domain.Data;
+using Grand.Domain.Blogs;
+using Grand.Domain.Catalog;
 using Grand.Services.Events;
 using MediatR;
 using MongoDB.Driver;
@@ -325,6 +325,29 @@ namespace Grand.Services.Blogs
         public virtual Task<BlogCategory> GetBlogCategoryById(string blogCategoryId)
         {
             return _blogCategoryRepository.GetByIdAsync(blogCategoryId);
+        }
+
+        /// <summary>
+        /// Get categories by post id
+        /// </summary>
+        /// <param name="blogPostId">Blog post id</param>
+        /// <returns></returns>
+        public virtual async Task<IList<BlogCategory>> GetBlogCategoryByPostId(string blogPostId)
+        {
+            return await _blogCategoryRepository.Table.Where(x => x.BlogPosts.Any(x => x.BlogPostId == blogPostId)).ToListAsync();
+        }
+
+        /// <summary>
+        /// Get category by sename
+        /// </summary>
+        /// <param name="blogCategorySeName">Blog category sename</param>
+        /// <returns></returns>
+        public virtual async Task<BlogCategory> GetBlogCategoryBySeName(string blogCategorySeName)
+        {
+            if (string.IsNullOrEmpty(blogCategorySeName))
+                throw new ArgumentNullException("blogCategorySeName");
+
+            return await _blogCategoryRepository.Table.Where(x => x.SeName == blogCategorySeName.ToLowerInvariant()).FirstOrDefaultAsync();
         }
 
         /// <summary>

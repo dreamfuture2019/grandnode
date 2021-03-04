@@ -83,7 +83,7 @@
                                 field: "Name",
                                 title: "@T("Admin.Customers.CustomerRoles.Products.Fields.Name")",
                                 width: 300,
-                                template: '<a class="k-link" href="@Url.Content("~/Admin/Product/Edit/")#=ProductId#">#=kendo.htmlEncode(Name)#</a>',
+                                template: '<a class="k-link" href="@Url.Action("Edit", "Product")/#=ProductId#">#=kendo.htmlEncode(Name)#</a>',
                         }, {
                             field: "DisplayOrder",
                             title: "@T("Admin.Customers.CustomerRoles.Products.Fields.DisplayOrder")",
@@ -109,7 +109,7 @@
                 });
         </script>
 
-        <script type="text/javascript">
+        <script>
             $(document).ready(function () {
                 $('#btnRefreshProducts').click(function () {
                     var grid = $("#products-grid").data('kendoGrid');

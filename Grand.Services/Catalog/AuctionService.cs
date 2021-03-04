@@ -1,19 +1,19 @@
-﻿using Grand.Core;
+﻿using Grand.Domain;
 using Grand.Core.Caching;
-using Grand.Core.Data;
-using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Localization;
-using Grand.Core.Domain.Stores;
+using Grand.Domain.Data;
+using Grand.Domain.Catalog;
+using Grand.Domain.Customers;
+using Grand.Domain.Localization;
+using Grand.Domain.Stores;
+using Grand.Services.Commands.Models.Catalog;
 using Grand.Services.Events;
-using Grand.Services.Messages;
 using MediatR;
-using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Grand.Core.Caching.Constants;
 
 namespace Grand.Services.Catalog
 {
@@ -23,26 +23,22 @@ namespace Grand.Services.Catalog
     public partial class AuctionService : IAuctionService
     {
         private readonly IRepository<Bid> _bidRepository;
-        private readonly IMediator _mediator;
         private readonly IProductService _productService;
         private readonly IRepository<Product> _productRepository;
-        private readonly ICacheManager _cacheManager;
-        private readonly IServiceProvider _serviceProvider;
-        private const string PRODUCTS_BY_ID_KEY = "Grand.product.id-{0}";
+        private readonly ICacheBase _cacheBase;
+        private readonly IMediator _mediator;
 
         public AuctionService(IRepository<Bid> bidRepository,
-            IMediator mediator,
             IProductService productService,
             IRepository<Product> productRepository,
-            ICacheManager cacheManager,
-            IServiceProvider serviceProvider)
+            ICacheBase cacheManager,
+            IMediator mediator)
         {
             _bidRepository = bidRepository;
-            _mediator = mediator;
             _productService = productService;
             _productRepository = productRepository;
-            _cacheManager = cacheManager;
-            _serviceProvider = serviceProvider;
+            _cacheBase = cacheManager;
+            _mediator = mediator;
         }
 
         public virtual async Task DeleteBid(Bid bid)
@@ -113,16 +109,16 @@ namespace Grand.Services.Catalog
 
             await _productRepository.Collection.UpdateOneAsync(filter, update);
 
+            await _cacheBase.RemoveAsync(string.Format(CacheKey.PRODUCTS_BY_ID_KEY, product.Id));
+
             await _mediator.EntityUpdated(product);
-            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, product.Id));
         }
 
         public virtual async Task<IList<Product>> GetAuctionsToEnd()
         {
             var builder = Builders<Product>.Filter;
             var filter = FilterDefinition<Product>.Empty;
-            filter = filter & builder.Where(x => x.ProductTypeId == (int)ProductType.Auction &&
-            !x.AuctionEnded && x.AvailableEndDateTimeUtc < DateTime.UtcNow);
+            filter &= builder.Where(x => x.ProductTypeId == (int)ProductType.Auction && !x.AuctionEnded && x.AvailableEndDateTimeUtc < DateTime.UtcNow);
             return await _productRepository.Collection.Find(filter).ToListAsync();
         }
 
@@ -137,8 +133,9 @@ namespace Grand.Services.Catalog
 
             await _productRepository.Collection.UpdateOneAsync(filter, update);
 
+            await _cacheBase.RemoveAsync(string.Format(CacheKey.PRODUCTS_BY_ID_KEY, product.Id));
+
             await _mediator.EntityUpdated(product);
-            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, product.Id));
         }
 
 
@@ -167,8 +164,11 @@ namespace Grand.Services.Catalog
             {
                 if (latestbid.CustomerId != customer.Id)
                 {
-                    var workflowmessageService = _serviceProvider.GetRequiredService<IWorkflowMessageService>();
-                    await workflowmessageService.SendOutBidCustomerNotification(product, language.Id, latestbid);
+                    await _mediator.Send(new SendOutBidCustomerNotificationCommand() {
+                        Product = product,
+                        Bid = latestbid,
+                        Language = language
+                    });
                 }
             }
             product.HighestBid = amount;

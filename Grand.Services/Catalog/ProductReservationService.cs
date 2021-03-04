@@ -1,6 +1,6 @@
-﻿using Grand.Core;
-using Grand.Core.Data;
-using Grand.Core.Domain.Catalog;
+﻿using Grand.Domain;
+using Grand.Domain.Data;
+using Grand.Domain.Catalog;
 using Grand.Services.Events;
 using MediatR;
 using MongoDB.Driver;
@@ -20,17 +20,15 @@ namespace Grand.Services.Catalog
         private readonly IRepository<ProductReservation> _productReservationRepository;
         private readonly IRepository<CustomerReservationsHelper> _customerReservationsHelperRepository;
         private readonly IMediator _mediator;
-        private readonly IWorkContext _workContext;
 
-        public ProductReservationService(IRepository<ProductReservation> productReservationRepository,
+        public ProductReservationService(
+            IRepository<ProductReservation> productReservationRepository,
             IRepository<CustomerReservationsHelper> customerReservationsHelperRepository,
-            IMediator mediator,
-            IWorkContext workContext)
+            IMediator mediator)
         {
             _productReservationRepository = productReservationRepository;
             _customerReservationsHelperRepository = customerReservationsHelperRepository;
             _mediator = mediator;
-            _workContext = workContext;
         }
 
         /// <summary>
@@ -90,6 +88,7 @@ namespace Grand.Services.Catalog
                 throw new ArgumentNullException("productAttribute");
 
             await _productReservationRepository.InsertAsync(productReservation);
+
             await _mediator.EntityInserted(productReservation);
         }
 
@@ -103,7 +102,8 @@ namespace Grand.Services.Catalog
                 throw new ArgumentNullException("productAttribute");
 
             await _productReservationRepository.UpdateAsync(productReservation);
-            await _mediator.EntityInserted(productReservation);
+
+            await _mediator.EntityUpdated(productReservation);
         }
 
         /// <summary>
@@ -126,6 +126,7 @@ namespace Grand.Services.Catalog
                 throw new ArgumentNullException("CustomerReservationsHelper");
 
             await _customerReservationsHelperRepository.InsertAsync(crh);
+
             await _mediator.EntityInserted(crh);
         }
 
@@ -139,6 +140,7 @@ namespace Grand.Services.Catalog
                 throw new ArgumentNullException("CustomerReservationsHelper");
 
             await _customerReservationsHelperRepository.DeleteAsync(crh);
+
             await _mediator.EntityDeleted(crh);
         }
 
@@ -170,9 +172,9 @@ namespace Grand.Services.Catalog
         /// Gets customer reservations helpers
         /// </summary>
         /// <returns>List<CustomerReservationsHelper></returns>
-        public virtual async Task<IList<CustomerReservationsHelper>> GetCustomerReservationsHelpers()
+        public virtual async Task<IList<CustomerReservationsHelper>> GetCustomerReservationsHelpers(string customerId)
         {
-            return await _customerReservationsHelperRepository.Table.Where(x => x.CustomerId == _workContext.CurrentCustomer.Id).ToListAsync();
+            return await _customerReservationsHelperRepository.Table.Where(x => x.CustomerId == customerId).ToListAsync();
         }
 
         /// <summary>

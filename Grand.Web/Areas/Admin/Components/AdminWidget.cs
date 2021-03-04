@@ -8,7 +8,7 @@ using System.Linq;
 
 namespace Grand.Web.Areas.Admin.Components
 {
-    public class AdminWidgetViewComponent : BaseViewComponent
+    public class AdminWidgetViewComponent : BaseAdminViewComponent
     {
         #region Fields
 
@@ -19,7 +19,7 @@ namespace Grand.Web.Areas.Admin.Components
 
         public AdminWidgetViewComponent(IWidgetService widgetService)
         {
-            this._widgetService = widgetService;
+            _widgetService = widgetService;
         }
 
         #endregion

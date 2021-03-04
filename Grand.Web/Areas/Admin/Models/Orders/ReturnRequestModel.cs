@@ -1,12 +1,13 @@
-﻿using Grand.Framework.Mvc.ModelBinding;
-using Grand.Framework.Mvc.Models;
+﻿using Grand.Core.ModelBinding;
+using Grand.Core.Models;
 using Grand.Web.Areas.Admin.Models.Common;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace Grand.Web.Areas.Admin.Models.Orders
 {
-    public partial class ReturnRequestModel : BaseGrandEntityModel
+    public partial class ReturnRequestModel : BaseEntityModel
     {
         public ReturnRequestModel()
         {
@@ -22,6 +23,10 @@ namespace Grand.Web.Areas.Admin.Models.Orders
         [GrandResourceDisplayName("Admin.ReturnRequests.Fields.Order")]
         public string OrderId { get; set; }
         public int OrderNumber { get; set; }
+        public string OrderCode { get; set; }
+
+        [GrandResourceDisplayName("Admin.ReturnRequests.Fields.ExternalId")]
+        public string ExternalId { get; set; }
 
         [GrandResourceDisplayName("Admin.ReturnRequests.Fields.Customer")]
         public string CustomerId { get; set; }
@@ -59,7 +64,17 @@ namespace Grand.Web.Areas.Admin.Models.Orders
         [GrandResourceDisplayName("Admin.ReturnRequests.NotifyCustomer")]
         public bool NotifyCustomer { get; set; }
 
-        public class ReturnRequestItemModel : BaseGrandEntityModel
+        //return request notes
+        [GrandResourceDisplayName("Admin.ReturnRequests.ReturnRequestNotes.Fields.DisplayToCustomer")]
+        public bool AddReturnRequestNoteDisplayToCustomer { get; set; }
+        [GrandResourceDisplayName("Admin.ReturnRequests.ReturnRequestNotes.Fields.Note")]
+        public string AddReturnRequestNoteMessage { get; set; }
+        public bool AddReturnRequestNoteHasDownload { get; set; }
+        [GrandResourceDisplayName("Admin.ReturnRequests.ReturnRequestNotes.Fields.Download")]
+        [UIHint("Download")]
+        public string AddReturnRequestNoteDownloadId { get; set; }
+
+        public class ReturnRequestItemModel : BaseEntityModel
         {
             public string ProductId { get; set; }
 
@@ -72,6 +87,23 @@ namespace Grand.Web.Areas.Admin.Models.Orders
             public string ReasonForReturn { get; set; }
 
             public string RequestedAction { get; set; }
+        }
+
+        public partial class ReturnRequestNote : BaseEntityModel
+        {
+            public string ReturnRequestId { get; set; }
+            [GrandResourceDisplayName("Admin.ReturnRequests.ReturnRequestNotes.Fields.DisplayToCustomer")]
+            public bool DisplayToCustomer { get; set; }
+            [GrandResourceDisplayName("Admin.ReturnRequests.ReturnRequestNotes.Fields.Note")]
+            public string Note { get; set; }
+            [GrandResourceDisplayName("Admin.ReturnRequests.ReturnRequestNotes.Fields.Download")]
+            public string DownloadId { get; set; }
+            [GrandResourceDisplayName("Admin.ReturnRequests.ReturnRequestNotes.Fields.Download")]
+            public Guid DownloadGuid { get; set; }
+            [GrandResourceDisplayName("Admin.ReturnRequests.ReturnRequestNotes.Fields.CreatedOn")]
+            public DateTime CreatedOn { get; set; }
+            [GrandResourceDisplayName("Admin.ReturnRequests.ReturnRequestNotes.Fields.CreatedByCustomer")]
+            public bool CreatedByCustomer { get; set; }
         }
     }
 }

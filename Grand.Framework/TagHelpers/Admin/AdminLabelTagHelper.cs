@@ -1,5 +1,5 @@
 ﻿using Grand.Core;
-using Grand.Framework.Mvc.ModelBinding;
+using Grand.Core.ModelBinding;
 using Grand.Services.Localization;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.TagHelpers;
@@ -65,7 +65,8 @@ namespace Grand.Framework.TagHelpers.Admin
                         i.AddCssClass("help icon-question");
                         i.Attributes.Add("title", hintResource);
                         i.Attributes.Add("data-toggle", "tooltip");
-                        i.Attributes.Add("data-placement", "left");
+                        i.Attributes.Add("data-placement", "top");
+                        i.Attributes.Add("data-container", "body");
                         output.Content.AppendHtml(i.ToHtmlString());
                     }
                 }

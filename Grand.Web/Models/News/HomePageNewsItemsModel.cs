@@ -1,23 +1,33 @@
-﻿using Grand.Framework.Mvc.Models;
+﻿using Grand.Core.Models;
+using Grand.Web.Models.Media;
 using System;
 using System.Collections.Generic;
 
 namespace Grand.Web.Models.News
 {
-    public partial class HomePageNewsItemsModel : BaseGrandModel, ICloneable
+    public partial class HomePageNewsItemsModel : BaseModel
     {
         public HomePageNewsItemsModel()
         {
             NewsItems = new List<NewsItemModel>();
         }
 
-        public string WorkingLanguageId { get; set; }
         public IList<NewsItemModel> NewsItems { get; set; }
 
-        public object Clone()
+        public class NewsItemModel : BaseModel
         {
-            //we use a shallow copy (deep clone is not required here)
-            return this.MemberwiseClone();
+            public NewsItemModel()
+            {
+                PictureModel = new PictureModel();
+            }
+
+            public string Id { get; set; }
+            public string SeName { get; set; }
+            public string Title { get; set; }
+            public PictureModel PictureModel { get; set; }
+            public string Short { get; set; }
+            public string Full { get; set; }
+            public DateTime CreatedOn { get; set; }
         }
     }
 }

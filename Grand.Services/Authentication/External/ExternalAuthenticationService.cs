@@ -1,14 +1,15 @@
 using Grand.Core;
-using Grand.Core.Data;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Localization;
 using Grand.Core.Plugins;
+using Grand.Domain.Customers;
+using Grand.Domain.Data;
+using Grand.Domain.Localization;
 using Grand.Services.Common;
 using Grand.Services.Customers;
-using Grand.Services.Events;
 using Grand.Services.Localization;
 using Grand.Services.Logging;
 using Grand.Services.Messages;
+using Grand.Services.Notifications.Authentication;
+using Grand.Services.Notifications.Customers;
 using Grand.Services.Orders;
 using MediatR;
 using Microsoft.AspNetCore.Http;
@@ -69,23 +70,23 @@ namespace Grand.Services.Authentication.External
             IWorkflowMessageService workflowMessageService,
             LocalizationSettings localizationSettings)
         {
-            this._customerSettings = customerSettings;
-            this._externalAuthenticationSettings = externalAuthenticationSettings;
-            this._authenticationService = authenticationService;
-            this._customerActivityService = customerActivityService;
-            this._customerRegistrationService = customerRegistrationService;
-            this._customerService = customerService;
-            this._mediator = mediator;
-            this._genericAttributeService = genericAttributeService;
-            this._httpContextAccessor = httpContextAccessor;
-            this._localizationService = localizationService;
-            this._pluginFinder = pluginFinder;
-            this._externalAuthenticationRecordRepository = externalAuthenticationRecordRepository;
-            this._shoppingCartService = shoppingCartService;
-            this._storeContext = storeContext;
-            this._workContext = workContext;
-            this._workflowMessageService = workflowMessageService;
-            this._localizationSettings = localizationSettings;
+            _customerSettings = customerSettings;
+            _externalAuthenticationSettings = externalAuthenticationSettings;
+            _authenticationService = authenticationService;
+            _customerActivityService = customerActivityService;
+            _customerRegistrationService = customerRegistrationService;
+            _customerService = customerService;
+            _mediator = mediator;
+            _genericAttributeService = genericAttributeService;
+            _httpContextAccessor = httpContextAccessor;
+            _localizationService = localizationService;
+            _pluginFinder = pluginFinder;
+            _externalAuthenticationRecordRepository = externalAuthenticationRecordRepository;
+            _shoppingCartService = shoppingCartService;
+            _storeContext = storeContext;
+            _workContext = workContext;
+            _workflowMessageService = workflowMessageService;
+            _localizationSettings = localizationSettings;
         }
 
         #endregion
@@ -107,10 +108,9 @@ namespace Grand.Services.Authentication.External
 
             //account is already assigned to another user
             if (currentLoggedInUser.Id != associatedUser.Id)
-                //TODO create locale for error
-                return Error(new[] { "Account is already assigned" }, returnUrl);
+                return Error(new[] { "Account is already assigned" });
 
-            if (String.IsNullOrEmpty(returnUrl))
+            if (string.IsNullOrEmpty(returnUrl))
                 return new RedirectToRouteResult("HomePage", new { area = "" });
             return new RedirectResult(returnUrl);
         }
@@ -128,7 +128,7 @@ namespace Grand.Services.Authentication.External
             if (currentLoggedInUser != null)
             {
                 await AssociateExternalAccountWithUser(currentLoggedInUser, parameters);
-                if (String.IsNullOrEmpty(returnUrl))
+                if (string.IsNullOrEmpty(returnUrl))
                     return new RedirectToRouteResult("HomePage", new { area = "" });
                 return new RedirectResult(returnUrl);
             }
@@ -138,8 +138,7 @@ namespace Grand.Services.Authentication.External
                 return await RegisterNewUser(parameters, returnUrl);
 
             //registration is disabled
-            //TODO create locale for error
-            return Error(new[] { "Registration is disabled" }, returnUrl);
+            return Error(new[] { "Registration is disabled" });
         }
 
         /// <summary>
@@ -150,18 +149,10 @@ namespace Grand.Services.Authentication.External
         /// <returns>Result of an authentication</returns>
         protected virtual async Task<IActionResult> RegisterNewUser(ExternalAuthenticationParameters parameters, string returnUrl)
         {
-            //if auto registration is disabled redirect to login page
-            //TODO remove this setting
-            if (!_externalAuthenticationSettings.AutoRegisterEnabled)
-            {
-                ExternalAuthorizerHelper.StoreParametersForRoundTrip(parameters, _httpContextAccessor);
-                return new RedirectToActionResult("Login", "Customer", !string.IsNullOrEmpty(returnUrl) ? new { ReturnUrl = returnUrl } : null);
-            }
-
             //or try to auto register new user
             //registration is approved if validation isn't required
             var registrationIsApproved = _customerSettings.UserRegistrationType == UserRegistrationType.Standard ||
-                (_customerSettings.UserRegistrationType == UserRegistrationType.EmailValidation && !_externalAuthenticationSettings.RequireEmailValidation);
+                (_customerSettings.UserRegistrationType == UserRegistrationType.EmailValidation);
 
             //create registration request
             var registrationRequest = new CustomerRegistrationRequest(_workContext.CurrentCustomer,
@@ -174,7 +165,7 @@ namespace Grand.Services.Authentication.External
             //whether registration request has been completed successfully
             var registrationResult = await _customerRegistrationService.RegisterCustomer(registrationRequest);
             if (!registrationResult.Success)
-                return Error(registrationResult.Errors, returnUrl);
+                return Error(registrationResult.Errors);
 
             //allow to save other customer values by consuming this event
             await _mediator.Publish(new CustomerAutoRegisteredByExternalMethodEvent(_workContext.CurrentCustomer, parameters));
@@ -184,7 +175,7 @@ namespace Grand.Services.Authentication.External
 
             //store owner notifications
             if (_customerSettings.NotifyNewCustomerRegistration)
-                await _workflowMessageService.SendCustomerRegisteredNotificationMessage(_workContext.CurrentCustomer, _localizationSettings.DefaultAdminLanguageId);
+                await _workflowMessageService.SendCustomerRegisteredNotificationMessage(_workContext.CurrentCustomer, _storeContext.CurrentStore, _localizationSettings.DefaultAdminLanguageId);
 
             //associate external account with registered user
             await AssociateExternalAccountWithUser(_workContext.CurrentCustomer, parameters);
@@ -193,7 +184,7 @@ namespace Grand.Services.Authentication.External
             if (registrationIsApproved)
             {
                 await _authenticationService.SignIn(_workContext.CurrentCustomer, false);
-                await _workflowMessageService.SendCustomerWelcomeMessage(_workContext.CurrentCustomer, _workContext.WorkingLanguage.Id);
+                await _workflowMessageService.SendCustomerWelcomeMessage(_workContext.CurrentCustomer, _storeContext.CurrentStore, _workContext.WorkingLanguage.Id);
 
                 return new RedirectToRouteResult("RegisterResult", new { resultId = (int)UserRegistrationType.Standard });
             }
@@ -203,7 +194,7 @@ namespace Grand.Services.Authentication.External
             {
                 //email validation message
                 await _genericAttributeService.SaveAttribute(_workContext.CurrentCustomer, SystemCustomerAttributeNames.AccountActivationToken, Guid.NewGuid().ToString());
-                await _workflowMessageService.SendCustomerEmailValidationMessage(_workContext.CurrentCustomer, _workContext.WorkingLanguage.Id);
+                await _workflowMessageService.SendCustomerEmailValidationMessage(_workContext.CurrentCustomer, _storeContext.CurrentStore, _workContext.WorkingLanguage.Id);
 
                 return new RedirectToRouteResult("RegisterResult", new { resultId = (int)UserRegistrationType.EmailValidation });
             }
@@ -212,8 +203,7 @@ namespace Grand.Services.Authentication.External
             if (_customerSettings.UserRegistrationType == UserRegistrationType.AdminApproval)
                 return new RedirectToRouteResult("RegisterResult", new { resultId = (int)UserRegistrationType.AdminApproval });
 
-            //TODO create locale for error
-            return Error(new[] { "Error on registration" }, returnUrl);
+            return Error(new[] { "Error on registration" });
         }
 
         /// <summary>
@@ -231,13 +221,14 @@ namespace Grand.Services.Authentication.External
             await _authenticationService.SignIn(user, false);
 
             //raise event       
-            await _mediator.Publish(new CustomerLoggedinEvent(user));
+            await _mediator.Publish(new CustomerLoggedInEvent(user));
 
             // activity log
             await _customerActivityService.InsertActivity("PublicStore.Login", "", _localizationService.GetResource("ActivityLog.PublicStore.Login"), user);
 
-            if (String.IsNullOrEmpty(returnUrl))
+            if (string.IsNullOrEmpty(returnUrl))
                 return new RedirectToRouteResult("HomePage", new { area = "" });
+
             return new RedirectResult(returnUrl);
         }
 
@@ -245,14 +236,10 @@ namespace Grand.Services.Authentication.External
         /// Add errors that occurred during authentication
         /// </summary>
         /// <param name="errors">Collection of errors</param>
-        /// <param name="returnUrl">URL to which the user will return after authentication</param>
         /// <returns>Result of an authentication</returns>
-        protected virtual IActionResult Error(IEnumerable<string> errors, string returnUrl)
+        protected virtual IActionResult Error(IEnumerable<string> errors)
         {
-            foreach (var error in errors)
-                ExternalAuthorizerHelper.AddErrorsToDisplay(error, _httpContextAccessor);
-
-            return new RedirectToActionResult("Login", "Customer", !string.IsNullOrEmpty(returnUrl) ? new { ReturnUrl = returnUrl } : null);
+            return new RedirectToActionResult("ExternalAuthenticationError", "Common", new { Errors = errors });
         }
 
         #endregion
@@ -331,8 +318,7 @@ namespace Grand.Services.Authentication.External
                 throw new ArgumentNullException("parameters");
 
             if (!ExternalAuthenticationMethodIsAvailable(parameters.ProviderSystemName))
-                //TODO create locale for error
-                return Error(new[] { "External authentication method cannot be loaded" }, returnUrl);
+                return Error(new[] { "External authentication method cannot be loaded" });
 
             //get current logged-in user
             var currentLoggedInUser = _workContext.CurrentCustomer.IsRegistered() ? _workContext.CurrentCustomer : null;
@@ -358,8 +344,7 @@ namespace Grand.Services.Authentication.External
             if (customer == null)
                 throw new ArgumentNullException("customer");
 
-            var externalAuthenticationRecord = new ExternalAuthenticationRecord
-            {
+            var externalAuthenticationRecord = new ExternalAuthenticationRecord {
                 CustomerId = customer.Id,
                 Email = parameters.Email,
                 ExternalIdentifier = parameters.ExternalIdentifier,
@@ -413,7 +398,7 @@ namespace Grand.Services.Authentication.External
             var query = from p in _externalAuthenticationRecordRepository.Table
                         where p.CustomerId == customer.Id
                         select p;
-            return await query.ToListAsync(); 
+            return await query.ToListAsync();
         }
 
         /// <summary>

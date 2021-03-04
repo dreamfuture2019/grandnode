@@ -1,6 +1,6 @@
 using Grand.Core.Caching;
-using Grand.Core.Data;
-using Grand.Core.Domain.Catalog;
+using Grand.Domain.Data;
+using Grand.Domain.Catalog;
 using Grand.Services.Events;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -10,6 +10,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using MongoDB.Driver.Linq;
 using MediatR;
+using Grand.Core.Caching.Constants;
 
 namespace Grand.Services.Catalog
 {
@@ -18,33 +19,11 @@ namespace Grand.Services.Catalog
     /// </summary>
     public partial class ProductTagService : IProductTagService
     {
-        #region Constants
-
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : store ID
-        /// </remarks>
-        private const string PRODUCTTAG_COUNT_KEY = "Grand.producttag.count-{0}";
-
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string PRODUCTTAG_PATTERN_KEY = "Grand.producttag.";
-
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>        
-        private const string PRODUCTS_PATTERN_KEY = "Grand.product.";
-
-        #endregion
-
         #region Fields
 
         private readonly IRepository<ProductTag> _productTagRepository;
         private readonly IRepository<Product> _productRepository;
-        private readonly ICacheManager _cacheManager;
+        private readonly ICacheBase _cacheBase;
         private readonly IMediator _mediator;
 
         #endregion
@@ -59,12 +38,12 @@ namespace Grand.Services.Catalog
         /// <param name="mediator">Mediator</param>
         public ProductTagService(IRepository<ProductTag> productTagRepository,
             IRepository<Product> productRepository,
-            ICacheManager cacheManager,
+            ICacheBase cacheManager,
             IMediator mediator
             )
         {
             _productTagRepository = productTagRepository;
-            _cacheManager = cacheManager;
+            _cacheBase = cacheManager;
             _mediator = mediator;
             _productRepository = productRepository;
         }
@@ -90,8 +69,8 @@ namespace Grand.Services.Catalog
         /// <returns>Dictionary of "product tag ID : product count"</returns>
         private async Task<Dictionary<string, int>> GetProductCount(string storeId)
         {
-            string key = string.Format(PRODUCTTAG_COUNT_KEY, storeId);
-            return await _cacheManager.GetAsync(key, async () =>
+            string key = string.Format(CacheKey.PRODUCTTAG_COUNT_KEY, storeId);
+            return await _cacheBase.GetAsync(key, async () =>
              {
                  var query = from pt in _productTagRepository.Table
                              select pt;
@@ -123,8 +102,8 @@ namespace Grand.Services.Catalog
             await _productTagRepository.DeleteAsync(productTag);
 
             //cache
-            await _cacheManager.RemoveByPrefix(PRODUCTTAG_PATTERN_KEY);
-            await _cacheManager.RemoveByPrefix(PRODUCTS_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.PRODUCTTAG_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.PRODUCTS_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityDeleted(productTag);
@@ -136,8 +115,11 @@ namespace Grand.Services.Catalog
         /// <returns>Product tags</returns>
         public virtual async Task<IList<ProductTag>> GetAllProductTags()
         {
-            var query = _productTagRepository.Table;
-            return await query.ToListAsync();
+            return await _cacheBase.GetAsync(CacheKey.PRODUCTTAG_ALL_KEY, async () =>
+            {
+                var query = _productTagRepository.Table;
+                return await query.ToListAsync();
+            });
         }
 
         /// <summary>
@@ -189,7 +171,7 @@ namespace Grand.Services.Catalog
             await _productTagRepository.InsertAsync(productTag);
 
             //cache
-            await _cacheManager.RemoveByPrefix(PRODUCTTAG_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.PRODUCTTAG_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityInserted(productTag);
@@ -218,11 +200,64 @@ namespace Grand.Services.Catalog
             await _productRepository.Collection.UpdateManyAsync(filter, update);
 
             //cache
-            await _cacheManager.RemoveByPrefix(PRODUCTTAG_PATTERN_KEY);
+            await _cacheBase.RemoveByPrefix(CacheKey.PRODUCTTAG_PATTERN_KEY);
 
             //event notification
             await _mediator.EntityUpdated(productTag);
         }
+
+        /// <summary>
+        /// Attach a tag to the product
+        /// </summary>
+        /// <param name="productPicture">Product picture</param>
+        public virtual async Task AttachProductTag(ProductTag productTag)
+        {
+            if (productTag == null)
+                throw new ArgumentNullException("productTag");
+
+            var updatebuilder = Builders<Product>.Update;
+            var update = updatebuilder.AddToSet(p => p.ProductTags, productTag.Name);
+            await _productRepository.Collection.UpdateOneAsync(new BsonDocument("_id", productTag.ProductId), update);
+
+            var builder = Builders<ProductTag>.Filter;
+            var filter = builder.Eq(x => x.Id, productTag.Id);
+            var updateTag = Builders<ProductTag>.Update
+                .Inc(x => x.Count, 1);
+            await _productTagRepository.Collection.UpdateManyAsync(filter, updateTag);
+
+            //cache
+            await _cacheBase.RemoveAsync(string.Format(CacheKey.PRODUCTS_BY_ID_KEY, productTag.ProductId));
+
+            //event notification
+            await _mediator.EntityInserted(productTag);
+        }
+
+        /// <summary>
+        /// Detach a tag from the product
+        /// </summary>
+        /// <param name="productTag">Product Tag</param>
+        public virtual async Task DetachProductTag(ProductTag productTag)
+        {
+            if (productTag == null)
+                throw new ArgumentNullException("productTag");
+
+            var updatebuilder = Builders<Product>.Update;
+            var update = updatebuilder.Pull(p => p.ProductTags, productTag.Name);
+            await _productRepository.Collection.UpdateOneAsync(new BsonDocument("_id", productTag.ProductId), update);
+
+            var builder = Builders<ProductTag>.Filter;
+            var filter = builder.Eq(x => x.Id, productTag.Id);
+            var updateTag = Builders<ProductTag>.Update
+                .Inc(x => x.Count, -1);
+            await _productTagRepository.Collection.UpdateManyAsync(filter, updateTag);
+
+            //cache
+            await _cacheBase.RemoveAsync(string.Format(CacheKey.PRODUCTS_BY_ID_KEY, productTag.ProductId));
+
+            //event notification
+            await _mediator.EntityDeleted(productTag);
+        }
+
 
         /// <summary>
         /// Get number of products

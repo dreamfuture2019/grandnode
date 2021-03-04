@@ -1,9 +1,10 @@
-﻿using Grand.Core.Configuration;
+﻿using Grand.Core;
+using Grand.Core.Configuration;
 using Grand.Core.Data;
-using Grand.Core.Infrastructure;
 using Grand.Framework.Infrastructure.Extensions;
 using Grand.Framework.Middleware;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -34,7 +35,7 @@ namespace Grand.Framework.StartupConfigure
         /// Configure the using of added middleware
         /// </summary>
         /// <param name="application">Builder for configuring an application's request pipeline</param>
-        public void Configure(IApplicationBuilder application)
+        public void Configure(IApplicationBuilder application, IWebHostEnvironment webHostEnvironment)
         {
             //check whether database is installed
             if (!DataSettingsHelper.DatabaseIsInstalled())
@@ -54,8 +55,7 @@ namespace Grand.Framework.StartupConfigure
         /// <summary>
         /// Gets order of this startup configuration implementation
         /// </summary>
-        public int Order
-        {
+        public int Order {
             //authentication should be loaded before MVC
             get { return 500; }
         }

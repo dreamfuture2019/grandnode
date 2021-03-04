@@ -1,8 +1,9 @@
 ﻿using DotLiquid;
-using Grand.Core.Domain.Localization;
-using Grand.Core.Domain.Orders;
-using Grand.Core.Domain.Shipping;
-using Grand.Core.Domain.Stores;
+using Grand.Domain.Localization;
+using Grand.Domain.Orders;
+using Grand.Domain.Shipping;
+using Grand.Domain.Stores;
+using System;
 using System.Collections.Generic;
 
 namespace Grand.Services.Messages.DotLiquidDrops
@@ -19,11 +20,11 @@ namespace Grand.Services.Messages.DotLiquidDrops
 
         public LiquidShipment(Shipment shipment, Order order, Store store, Language language)
         {
-            this._shipment = shipment;
-            this._language = language;
-            this._store = store;
-            this._order = order;
-            this._shipmentItems = new List<LiquidShipmentItem>();
+            _shipment = shipment;
+            _language = language;
+            _store = store;
+            _order = order;
+            _shipmentItems = new List<LiquidShipmentItem>();
             AdditionalTokens = new Dictionary<string, string>();
         }
 
@@ -40,6 +41,17 @@ namespace Grand.Services.Messages.DotLiquidDrops
         public string TrackingNumber
         {
             get { return _shipment.TrackingNumber; }
+        }
+
+        public DateTime? ShippedDateUtc {
+            get { return _shipment.ShippedDateUtc; }
+        }
+
+        public DateTime? DeliveryDateUtc {
+            get { return _shipment.DeliveryDateUtc; }
+        }
+        public DateTime CreatedOnUtc {
+            get { return _shipment.CreatedOnUtc; }
         }
 
         public string AdminComment

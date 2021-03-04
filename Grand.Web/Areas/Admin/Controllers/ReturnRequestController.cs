@@ -1,8 +1,10 @@
 ﻿using Grand.Core;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Orders;
+using Grand.Domain.Common;
+using Grand.Domain.Customers;
+using Grand.Domain.Orders;
 using Grand.Framework.Controllers;
 using Grand.Framework.Kendoui;
+using Grand.Framework.Mvc;
 using Grand.Framework.Mvc.Filters;
 using Grand.Framework.Security.Authorization;
 using Grand.Services.Common;
@@ -14,6 +16,8 @@ using Grand.Web.Areas.Admin.Interfaces;
 using Grand.Web.Areas.Admin.Models.Orders;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
@@ -26,6 +30,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         private readonly IReturnRequestViewModelService _returnRequestViewModelService;
         private readonly ILocalizationService _localizationService;
         private readonly IReturnRequestService _returnRequestService;
+        private readonly IOrderService _orderService;
         private readonly IWorkContext _workContext;
 
         #endregion Fields
@@ -36,11 +41,13 @@ namespace Grand.Web.Areas.Admin.Controllers
             IReturnRequestViewModelService returnRequestViewModelService,
             ILocalizationService localizationService,
             IReturnRequestService returnRequestService,
+            IOrderService orderService,
             IWorkContext workContext)
         {
             _returnRequestViewModelService = returnRequestViewModelService;
             _localizationService = localizationService;
             _returnRequestService = returnRequestService;
+            _orderService = orderService;
             _workContext = workContext;
         }
 
@@ -57,6 +64,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return View(model);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.List)]
         [HttpPost]
         public async Task<IActionResult> List(DataSourceRequest command, ReturnReqestListModel model)
         {
@@ -73,6 +81,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         [HttpPost, ActionName("List")]
         [FormValueRequired("go-to-returnrequest")]
         public async Task<IActionResult> GoToId(ReturnReqestListModel model)
@@ -80,7 +89,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             if (model.GoDirectlyToId == null)
                 return RedirectToAction("List", "ReturnRequest");
 
-            int id = int.Parse(model.GoDirectlyToId);
+            int.TryParse(model.GoDirectlyToId, out var id);
 
             //try to load a product entity
             var returnRequest = await _returnRequestService.GetReturnRequestById(id);
@@ -96,6 +105,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             return RedirectToAction("Edit", "ReturnRequest", new { id = returnRequest.Id });
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         [HttpPost]
         public async Task<IActionResult> ProductsForReturnRequest(string returnRequestId, DataSourceRequest command)
         {
@@ -117,6 +127,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         //edit
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
         public async Task<IActionResult> Edit(string id)
         {
             var returnRequest = await _returnRequestService.GetReturnRequestById(id);
@@ -129,11 +140,16 @@ namespace Grand.Web.Areas.Admin.Controllers
                 return RedirectToAction("List", "ReturnRequest");
             }
 
+            //a vendor should have access only to his return request
+            if (_workContext.CurrentVendor != null && returnRequest.VendorId != _workContext.CurrentVendor.Id)
+                return RedirectToAction("List", "ReturnRequest");
+
             var model = new ReturnRequestModel();
             await _returnRequestViewModelService.PrepareReturnRequestModel(model, returnRequest, false);
             return View(model);
         }
 
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
         [FormValueRequired("save", "save-continue")]
         public async Task<IActionResult> Edit(ReturnRequestModel model, bool continueEditing, IFormCollection form,
@@ -152,7 +168,11 @@ namespace Grand.Web.Areas.Admin.Controllers
                 return RedirectToAction("List", "ReturnRequest");
             }
 
-            var customAddressAttributes = string.Empty;
+            //a vendor should have access only to his return request
+            if (_workContext.CurrentVendor != null && returnRequest.VendorId != _workContext.CurrentVendor.Id)
+                return RedirectToAction("List", "ReturnRequest");
+
+            var customAddressAttributes = new List<CustomAttribute>();
             if (orderSettings.ReturnRequests_AllowToSpecifyPickupAddress)
             {
                 customAddressAttributes = await form.ParseCustomAddressAttributes(addressAttributeParser, addressAttributeService);
@@ -176,6 +196,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         //delete
+        [PermissionAuthorizeAction(PermissionActionName.Delete)]
         [HttpPost]
         public async Task<IActionResult> Delete(string id)
         {
@@ -189,6 +210,10 @@ namespace Grand.Web.Areas.Admin.Controllers
                 return RedirectToAction("List", "ReturnRequest");
             }
 
+            //a vendor can't delete return request
+            if (_workContext.CurrentVendor != null)
+                return RedirectToAction("List", "ReturnRequest");
+
             if (ModelState.IsValid)
             {
                 await _returnRequestViewModelService.DeleteReturnRequest(returnRequest);
@@ -199,6 +224,81 @@ namespace Grand.Web.Areas.Admin.Controllers
             return RedirectToAction("Edit", new { id = returnRequest.Id });
         }
 
+        #endregion
+
+        #region Return request notes
+
+        [PermissionAuthorizeAction(PermissionActionName.Preview)]
+        [HttpPost]
+        public async Task<IActionResult> ReturnRequestNotesSelect(string returnRequestId, DataSourceRequest command)
+        {
+            var returnRequest = await _returnRequestService.GetReturnRequestById(returnRequestId);
+            if (returnRequest == null)
+                throw new ArgumentException("No return request found with the specified id");
+
+            if (_workContext.CurrentCustomer.IsStaff() && returnRequest.StoreId != _workContext.CurrentCustomer.StaffStoreId)
+            {
+                return Content("");
+            }
+            //a vendor should have access only to his return request
+            if (_workContext.CurrentVendor != null && returnRequest.VendorId != _workContext.CurrentVendor.Id)
+                return Content("");
+
+            //return request notes
+            var returnRequestNoteModels = await _returnRequestViewModelService.PrepareReturnRequestNotes(returnRequest);
+            var gridModel = new DataSourceResult {
+                Data = returnRequestNoteModels,
+                Total = returnRequestNoteModels.Count
+            };
+            return Json(gridModel);
+        }
+
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
+        public async Task<IActionResult> ReturnRequestNoteAdd(string returnRequestId, string orderId, string downloadId, bool displayToCustomer, string message)
+        {
+            var returnRequest = await _returnRequestService.GetReturnRequestById(returnRequestId);
+            if (returnRequest == null)
+                return Json(new { Result = false });
+
+            var order = await _orderService.GetOrderById(orderId);
+            if (order == null)
+                return Json(new { Result = false });
+
+            if (_workContext.CurrentCustomer.IsStaff() && returnRequest.StoreId != _workContext.CurrentCustomer.StaffStoreId)
+            {
+                return Json(new { Result = false });
+            }
+
+            //a vendor should have access only to his return request
+            if (_workContext.CurrentVendor != null && returnRequest.VendorId != _workContext.CurrentVendor.Id)
+                return Json(new { Result = false });
+
+            await _returnRequestViewModelService.InsertReturnRequestNote(returnRequest, order, downloadId, displayToCustomer, message);
+
+            return Json(new { Result = true });
+        }
+
+        [PermissionAuthorizeAction(PermissionActionName.Edit)]
+        [HttpPost]
+        public async Task<IActionResult> ReturnRequestNoteDelete(string id, string returnRequestId)
+        {
+            var returnRequest = await _returnRequestService.GetReturnRequestById(returnRequestId);
+            if (returnRequest == null)
+                throw new ArgumentException("No return request found with the specified id");
+
+            //a vendor does not have access to this functionality
+            if (_workContext.CurrentVendor != null && !_workContext.CurrentCustomer.IsStaff())
+                return Json(new { Result = false });
+
+            if (_workContext.CurrentCustomer.IsStaff() && returnRequest.StoreId != _workContext.CurrentCustomer.StaffStoreId)
+            {
+                return Json(new { Result = false });
+            }
+
+            await _returnRequestViewModelService.DeleteReturnRequestNote(returnRequest, id);
+
+            return new NullJsonResult();
+        }
         #endregion
     }
 }

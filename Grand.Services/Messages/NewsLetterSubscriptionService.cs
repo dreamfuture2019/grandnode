@@ -1,8 +1,10 @@
 using Grand.Core;
-using Grand.Core.Data;
-using Grand.Core.Domain.Messages;
+using Grand.Domain;
+using Grand.Domain.Data;
+using Grand.Domain.Messages;
 using Grand.Services.Common;
 using Grand.Services.Events;
+using Grand.Services.Events.Extensions;
 using MediatR;
 using MongoDB.Driver.Linq;
 using System;
@@ -110,12 +112,25 @@ namespace Grand.Services.Messages
             //Handle e-mail
             newsLetterSubscription.Email = CommonHelper.EnsureSubscriberEmailOrThrow(newsLetterSubscription.Email);
 
+            //get previous newsLetterSubscription record
+            var prevnewsLetterSubscription = await _subscriptionRepository.GetByIdAsync(newsLetterSubscription.Id);
+
             //Persist
             await _subscriptionRepository.UpdateAsync(newsLetterSubscription);
 
             //save history
             await newsLetterSubscription.SaveHistory<NewsLetterSubscription>(_historyService);
 
+            //Publish the un/subscribe event 
+            if (prevnewsLetterSubscription != null)
+            {
+                if (newsLetterSubscription.Active && !prevnewsLetterSubscription.Active)
+                    await PublishSubscriptionEvent(newsLetterSubscription.Email, true, publishSubscriptionEvents);
+
+                if (!newsLetterSubscription.Active && prevnewsLetterSubscription.Active)
+                    await PublishSubscriptionEvent(newsLetterSubscription.Email, false, publishSubscriptionEvents);
+
+            }
             //Publish event
             await _mediator.EntityUpdated(newsLetterSubscription);
         }
